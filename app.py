@@ -40,8 +40,6 @@ class PasswordManager:
 
 # --- 3. DATABASE MANAGER (GOOGLE SHEETS) ---
 # Hàm này giúp kết nối với "Ổ cứng"
-# --- SỬA LẠI HÀM NÀY ĐỂ BẮT LỖI ---
-# --- HÀM KẾT NỐI GOOGLE SHEETS (ĐÃ VÁ LỖI INCORRECT PADDING) ---
 def connect_gsheet():
     try:
         # 1. Kiểm tra xem có secrets chưa
