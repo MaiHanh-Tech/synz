@@ -1,0 +1,10 @@
+streamlit
+google-generativeai
+pandas
+sentence-transformers
+scikit-learn
+pypdf
+python-docx
+beautifulsoup4
+openpyxl
+numpy
