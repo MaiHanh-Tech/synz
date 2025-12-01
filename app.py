@@ -41,27 +41,39 @@ class PasswordManager:
 # --- 3. DATABASE MANAGER (GOOGLE SHEETS) ---
 # Hàm này giúp kết nối với "Ổ cứng"
 # --- SỬA LẠI HÀM NÀY ĐỂ BẮT LỖI ---
+# --- HÀM KẾT NỐI GOOGLE SHEETS (ĐÃ VÁ LỖI INCORRECT PADDING) ---
 def connect_gsheet():
     try:
-        # Lấy thông tin Service Account từ Secrets
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        
-        # Kiểm tra xem có secrets chưa
+        # 1. Kiểm tra xem có secrets chưa
         if "gcp_service_account" not in st.secrets:
-            st.error("❌ LỖI: Chưa cấu hình [gcp_service_account] trong Secrets!")
             return None
 
+        # 2. Lấy thông tin từ Secrets ra
         creds_dict = dict(st.secrets["gcp_service_account"])
+        
+        # 3. --- VÁ LỖI QUAN TRỌNG Ở ĐÂY ---
+        # Lỗi "Incorrect padding" thường do private_key bị sai định dạng xuống dòng
+        # Dòng này sẽ tự động sửa lại cho đúng chuẩn Google
+        if "private_key" in creds_dict:
+            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        # ---------------------------------
+
+        # 4. Kết nối
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         
-        # Mở file sheet theo tên
-        sheet = client.open("AI_History_Logs").sheet1 
-        return sheet
-        
+        # 5. Mở file (Nếu không tìm thấy file, in lỗi rõ ràng)
+        try:
+            sheet = client.open("AI_History_Logs").sheet1 
+            return sheet
+        except gspread.SpreadsheetNotFound:
+            st.toast("⚠️ Không tìm thấy file Google Sheet! Chị đã Share cho Robot chưa?", icon="🤖")
+            return None
+            
     except Exception as e:
-        # IN LỖI RA MÀN HÌNH ĐỂ CHỊ THẤY
-        st.error(f"❌ KHÔNG KẾT NỐI ĐƯỢC GOOGLE SHEET: {e}")
+        # In lỗi ra sidebar để debug nếu cần
+        # st.sidebar.error(f"Lỗi G-Sheet: {e}") 
         return None
 
 def luu_lich_su_vinh_vien(loai, tieu_de, noi_dung):
