@@ -698,7 +698,7 @@ def show_main_app():
                             "- Hoặc chuyển sang dịch vụ TTS khác ổn định hơn."
                         )
 
-    # === TAB 5: LỊCH SỬ + NHẬT KÝ CẢM XÚC ===
+       # === TAB 5: LỊCH SỬ + NHẬT KÝ CẢM XÚC ===
     with tab5:
         st.header("Kho Lưu Trữ & Nhật ký cảm xúc")
 
@@ -763,6 +763,7 @@ def show_main_app():
                     st.markdown(item["content"])
         else:
             st.info("Chưa có lịch sử.")
+
 
 
 # --- 6. MAIN ---
