@@ -326,45 +326,86 @@ def show_main_app():
             st.session_state.chat_history.append({"role":"assistant", "content":res.text})
 
     # === TAB 4: PHÒNG THU AI (MỚI THÊM) ===
+    # === TAB 4: PHÒNG THU AI QUỐC TẾ (NÂNG CẤP) ===
     with tab4:
-        st.header("🎙️ Phòng Thu AI (Edge TTS Miễn Phí)")
+        st.header("🎙️ Phòng Thu AI Đa Ngôn Ngữ")
+        st.caption("Công nghệ lõi: Microsoft Edge TTS (Miễn phí - Chất lượng cao)")
+
+        # 1. CẤU HÌNH GIỌNG ĐỌC (TUYỂN CHỌN KỸ)
+        voice_options = {
+            "🇻🇳 Việt - Nam (Nam Minh - Trầm ấm)": "vi-VN-NamMinhNeural",
+            "🇻🇳 Việt - Nữ (Hoài My - Ngọt ngào)": "vi-VN-HoaiMyNeural",
+            "🇺🇸 Anh - Nam (Christopher - Trầm, Lịch lãm)": "en-US-ChristopherNeural",
+            "🇺🇸 Anh - Nữ (Jenny - Tự nhiên, Thanh toát)": "en-US-JennyNeural",
+            "🇨🇳 Trung - Nam (Yunxi - Trầm ổn, Tự nhiên)": "zh-CN-YunxiNeural",
+            "🇨🇳 Trung - Nữ (Xiaoxiao - Ấm áp, Ngọt ngào)": "zh-CN-XiaoxiaoNeural"
+        }
+
+        # 2. GIAO DIỆN NHẬP LIỆU
+        c_text, c_config = st.columns([3, 1])
         
-        c_text, c_opt = st.columns([3, 1])
+        with c_config:
+            st.markdown("#### 🎛️ Cấu hình")
+            selected_label = st.selectbox("Chọn Giọng Đọc:", list(voice_options.keys()))
+            selected_voice_code = voice_options[selected_label]
+            
+            # Tính năng chỉnh tốc độ (Bonus cho Chị)
+            speed = st.slider("Tốc độ đọc:", -50, 50, 0, format="%d%%")
+            rate_str = f"{'+' if speed >= 0 else ''}{speed}%"
+
         with c_text:
-            tts_input = st.text_area("Nhập văn bản muốn đọc:", height=150, placeholder="Nhập tiếng Việt vào đây để Nam Minh đọc...")
-        
-        with c_opt:
-            voice_choice = st.selectbox(
-                "Chọn Giọng Đọc:",
-                ["Nam Minh (Nam - Trầm ấm)", "Hoài My (Nữ - Ngọt ngào)","Yụnian", "Xiaoyi", "Emma", "AndrewMultilingual"]
+            # Giới hạn an toàn cho Edge TTS là khoảng 5000 ký tự/lần
+            MAX_CHARS = 5000 
+            input_text = st.text_area(
+                "Nhập văn bản (Việt / Anh / Trung):", 
+                height=250, 
+                placeholder=f"Dán nội dung sách vào đây... (Tối đa {MAX_CHARS} ký tự để đảm bảo ổn định)"
             )
-            st.write("")
-            btn_speak = st.button("🔊 Đọc Ngay", type="primary", use_container_width=True)
-        
-        if btn_speak and tts_input:
-            with st.spinner("Đang thu âm..."):
+            
+            # Đếm ký tự và Cảnh báo
+            char_count = len(input_text)
+            if char_count > MAX_CHARS:
+                st.error(f"⚠️ CẢNH BÁO: Văn bản quá dài ({char_count}/{MAX_CHARS} ký tự). Vui lòng cắt bớt để tránh lỗi hệ thống!")
+                can_run = False
+            else:
+                st.info(f"📊 Độ dài: {char_count}/{MAX_CHARS} ký tự (Ước tính: ~{round(char_count/15/60, 1)} phút audio)")
+                can_run = True
+
+        # 3. NÚT TẠO VÀ TẢI
+        if st.button("🔊 BẮT ĐẦU TẠO AUDIO", type="primary", use_container_width=True, disabled=not (input_text and can_run)):
+            with st.spinner("Đang trong phòng thu (Vui lòng đợi, không tắt tab)..."):
                 try:
-                    # Gọi hàm tạo audio
-                    audio_file = run_tts(tts_input, voice_choice)
+                    # Cập nhật hàm tạo audio có thêm tốc độ
+                    async def gen_audio_v2(text, voice, rate, filename):
+                        communicate = edge_tts.Communicate(text, voice, rate=rate)
+                        await communicate.save(filename)
+                        
+                    output_file = "studio_output.mp3"
+                    asyncio.run(gen_audio_v2(input_text, selected_voice_code, rate_str, output_file))
                     
-                    # Hiện thanh phát nhạc
-                    st.success("✅ Đã tạo xong!")
-                    st.audio(audio_file, format="audio/mp3")
+                    # Hiển thị kết quả
+                    st.success("✅ Thu âm hoàn tất!")
                     
-                    # Nút tải về
-                    with open(audio_file, "rb") as f:
+                    # Player
+                    st.audio(output_file, format="audio/mp3")
+                    
+                    # Nút tải về (To, Rõ ràng)
+                    with open(output_file, "rb") as f:
+                        file_bytes = f.read()
                         st.download_button(
-                            label="⬇️ Tải file MP3",
-                            data=f,
-                            file_name="voice_output.mp3",
-                            mime="audio/mpeg"
+                            label="💾 TẢI AUDIO VỀ MÁY (MP3)",
+                            data=file_bytes,
+                            file_name=f"audio_{datetime.now().strftime('%H%M%S')}.mp3",
+                            mime="audio/mpeg",
+                            icon="⬇️"
                         )
                     
-                    luu_lich_su_vinh_vien("Tạo Giọng Nói", f"Giọng: {voice_choice}", tts_input[:50] + "...")
+                    # Lưu lịch sử
+                    luu_lich_su_vinh_vien("Tạo Audio", selected_label, input_text[:100]+"...")
                     
                 except Exception as e:
-                    st.error(f"Lỗi: {str(e)}")
-
+                    st.error(f"❌ Lỗi Kỹ Thuật: {str(e)}")
+                    
     # === TAB 5: LỊCH SỬ ===
     with tab5:
         st.header("Kho Lưu Trữ (Google Sheets)")
