@@ -153,19 +153,18 @@ def tai_lich_su_tu_sheet():
             data = sheet.get_all_records()
             formatted = []
             for item in 
-                formatted.append(
-                    {
-                        "time": item.get("Time", ""),
-                        "type": item.get("Type", ""),
-                        "title": item.get("Title", ""),
-                        "content": item.get("Content", ""),
-                        "sentiment_score": item.get("SentimentScore", 0.0),
-                        "sentiment_label": item.get(
-                            "SentimentLabel", "Neutral"
-                        ),
-                    }
-                )
-            return formatted
+    formatted.append(
+        {
+            "time": item.get("Time", ""),
+            "type": item.get("Type", ""),
+            "title": item.get("Title", ""),
+            "content": item.get("Content", ""),
+            "sentiment_score": item.get("SentimentScore", 0.0),
+            "sentiment_label": item.get("SentimentLabel", "Neutral"),
+        }
+    )
+return formatted
+
     except Exception:
         return []
     return []
