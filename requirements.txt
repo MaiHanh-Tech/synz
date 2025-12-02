@@ -13,3 +13,5 @@ oauth2client
 plotly
 markdown
 edge-tts
+streamlit-agraph
+networkx
