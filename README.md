@@ -3,7 +3,7 @@
 > **"Không chỉ là App, đây là Bộ não thứ hai."**
 
 ## 🌟 Giới thiệu
-Đây là hệ thống quản trị tri thức cá nhân (PKM) được xây dựng dựa trên mô hình **RAG (Retrieval-Augmented Generation)** và **Gemini 1.5 Pro**. Ứng dụng giúp kết nối hàng trăm cuốn sách đã đọc với những tri thức mới được cập nhật hàng ngày.
+Đây là hệ thống quản trị tri thức cá nhân (PKM) được xây dựng dựa trên mô hình **RAG (Retrieval-Augmented Generation)** và **Gemini 2.5 Pro**. Ứng dụng giúp kết nối hàng trăm cuốn sách đã đọc với những tri thức mới được cập nhật hàng ngày.
 
 ## 🚀 Tính năng nổi bật
 
@@ -27,7 +27,7 @@
 
 ## 🛠 Công nghệ sử dụng
 - **Core:** Python, Streamlit.
-- **AI Model:** Google Gemini 1.5 Flash / Pro.
+- **AI Model:** Google Gemini 2.5 Flash / Pro.
 - **Vector Database:** Sentence-Transformers (`paraphrase-multilingual`).
 - **Database:** Google Sheets API (`gspread`).
 - **Visualization:** Plotly.
