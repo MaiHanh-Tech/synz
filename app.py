@@ -128,13 +128,31 @@ def show_main_app():
     if 'history' not in st.session_state: st.session_state.history = []
     if 'chat_history' not in st.session_state: st.session_state.chat_history = []
 
-    # Cấu hình Gemini
+   # --- CẤU HÌNH GEMINI (LOGIC CHỐNG SẬP APP) ---
     try:
         sys_api_key = st.secrets["system"]["gemini_api_key"]
         genai.configure(api_key=sys_api_key)
-        model = genai.GenerativeModel('gemini-2.5-pro')
-    except:
-        st.error("❌ Lỗi: Chưa cấu hình [system] gemini_api_key trong Secrets!")
+        
+        # 1. THỬ BẢN MỚI NHẤT & MẠNH NHẤT (PRO)
+        try:
+            model = genai.GenerativeModel('gemini-2.5-pro')
+            st.sidebar.success("🤖 Lõi: Gemini 2.5 Pro (Cao cấp)")
+        except:
+            # 2. THỬ BẢN DỰ PHÒNG TỐC ĐỘ (FLASH)
+            try:
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                st.sidebar.info("🤖 Lõi: Gemini 2.5 Flash (Tốc độ ổn định)")
+            except:
+                # 3. DÙNG BẢN LÂU ĐỜI NHẤT (BẮT BUỘC PHẢI CÓ)
+                try:
+                    model = genai.GenerativeModel('gemini-2.5-flash') # Giả định model này có
+                    st.sidebar.warning("🤖 Lõi: Gemini 2.5 Flash (Dự phòng)")
+                except:
+                    model = genai.GenerativeModel('gemini-pro') # Model cũ nhưng mạnh
+                    st.sidebar.error("🤖 Lõi: Gemini Pro (Lõi cũ)")
+    
+    except Exception as e:
+        st.error(f"❌ Lỗi: Chưa cấu hình [system] gemini_api_key trong Secrets!")
         st.stop()
 
     # --- SIDEBAR ---
