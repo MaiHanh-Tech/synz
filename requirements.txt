@@ -16,3 +16,5 @@ edge-tts
 streamlit-agraph
 networkx
 google-auth
+python-telegram-bot  
+langdetect          
