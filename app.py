@@ -330,13 +330,13 @@ def show_main_app():
             st.chat_message("assistant").markdown(res.text)
             st.session_state.chat_history.append({"role":"assistant", "content":res.text})
 
-    # === TAB 4: PHÒNG THU AI QUỐC TẾ (NÂNG CẤP) ===
     # === TAB 4: PHÒNG THU AI QUỐC TẾ (ĐÃ SỬA LỖI & CẬP NHẬT GIỌNG) ===
+        # === TAB 4: PHÒNG THU AI ĐA NGÔN NGỮ (EDGE TTS) ===
     with tab4:
         st.header("🎙️ Phòng Thu AI Đa Ngôn Ngữ")
-        st.caption("Công nghệ lõi: Microsoft Edge TTS (Sửa lỗi & Cập nhật giọng mới)")
+        st.caption("Công nghệ lõi: Microsoft Edge TTS")
 
-        # 1. CẤU HÌNH GIỌNG ĐỌC (MÃ CHUẨN XÁC)
+        # 1. CẤU HÌNH GIỌNG
         voice_options = {
             "🇻🇳 Việt - Nam (Nam Minh - Trầm ấm)": "vi-VN-NamMinhNeural",
             "🇻🇳 Việt - Nữ (Hoài My - Ngọt ngào)": "vi-VN-HoaiMyNeural",
@@ -346,72 +346,93 @@ def show_main_app():
             "🇨🇳 Trung - Nữ (Xiaoyi - Nhẹ nhàng, Tình cảm)": "zh-CN-XiaoyiNeural"
         }
 
-        # 2. GIAO DIỆN
         c_text, c_config = st.columns([3, 1])
-        
         with c_config:
             st.markdown("#### 🎛️ Cấu hình")
             selected_label = st.selectbox("Chọn Giọng Đọc:", list(voice_options.keys()))
             selected_voice_code = voice_options[selected_label]
-            
-            # Tốc độ đọc
+
+            # Tốc độ nói
             speed = st.slider("Tốc độ:", -50, 50, 0, format="%d%%")
             rate_str = f"{'+' if speed >= 0 else ''}{speed}%"
 
         with c_text:
-            # Giới hạn ký tự an toàn
-            MAX_CHARS = 4000 
+            MAX_CHARS = 4000
             input_text = st.text_area(
-                "Nhập văn bản:", 
-                height=250, 
-                placeholder="Dán nội dung vào đây... (Lưu ý: Nếu báo lỗi 'No audio', hãy thử cắt ngắn văn bản lại)"
+                "Nhập văn bản:",
+                height=250,
+                placeholder="Dán nội dung vào đây... (hạn chế ký tự đặc biệt, nên có câu hoàn chỉnh)"
             )
-            
             char_count = len(input_text)
             st.caption(f"Độ dài: {char_count}/{MAX_CHARS} ký tự")
 
-        # 3. XỬ LÝ TẠO AUDIO (Hàm nằm trong nút bấm để tránh lỗi Async)
+        # 2. HÀM ASYNC DÙNG CHUNG
+        async def _edge_tts_generate(text, voice_code, rate, out_path):
+            communicate = edge_tts.Communicate(text, voice_code, rate=rate)
+            await communicate.save(out_path)
+
+        def generate_edge_audio_sync(text, voice_code, rate, out_path="studio_output.mp3"):
+            # Không dùng asyncio.run nếu đã có event loop (tránh xung đột trên một số môi trường)
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Trong trường hợp Streamlit chạy event loop sẵn, dùng create_task + run_until_complete phụ
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    new_loop.run_until_complete(_edge_tts_generate(text, voice_code, rate, out_path))
+                    new_loop.close()
+                    asyncio.set_event_loop(loop)
+                else:
+                    loop.run_until_complete(_edge_tts_generate(text, voice_code, rate, out_path))
+            except RuntimeError:
+                # Nếu chưa có loop, tạo mới
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                new_loop.run_until_complete(_edge_tts_generate(text, voice_code, rate, out_path))
+                new_loop.close()
+
+        # 3. NÚT TẠO AUDIO
         if st.button("🔊 BẮT ĐẦU TẠO AUDIO", type="primary", use_container_width=True, disabled=(char_count == 0)):
-            if char_count > MAX_CHARS:
+            # Kiểm tra cơ bản trước khi gọi API
+            if char_count == 0:
+                st.error("⚠️ Vui lòng nhập nội dung.")
+            elif char_count > MAX_CHARS:
                 st.error(f"⚠️ Quá dài! Vui lòng cắt bớt dưới {MAX_CHARS} ký tự.")
+            elif len("".join(ch for ch in input_text if ch.isalpha())) < 5:
+                st.error("⚠️ Nội dung quá ít chữ cái (chỉ toàn ký tự đặc biệt?). Hãy nhập câu đầy đủ hơn.")
             else:
-                with st.spinner("Đang kết nối đến máy chủ Microsoft..."):
+                with st.spinner("Đang tạo audio từ Microsoft Edge TTS..."):
                     try:
-                        import edge_tts
-                        import asyncio
+                        out_file = "studio_output.mp3"
+                        generate_edge_audio_sync(input_text, selected_voice_code, rate_str, out_file)
 
-                        # Hàm nội bộ để chạy async
-                        async def get_voice_data():
-                            communicate = edge_tts.Communicate(input_text, selected_voice_code, rate=rate_str)
-                            await communicate.save("studio_output.mp3")
-
-                        # Chạy hàm
-                        asyncio.run(get_voice_data())
-                        
-                        # Hiển thị kết quả
                         st.success(f"✅ Đã tạo xong với giọng: {selected_label}")
-                        
-                        # Player
-                        st.audio("studio_output.mp3", format="audio/mp3")
-                        
-                        # Nút tải về
-                        with open("studio_output.mp3", "rb") as f:
+                        st.audio(out_file, format="audio/mp3")
+
+                        with open(out_file, "rb") as f:
                             file_bytes = f.read()
-                            st.download_button(
-                                label="⬇️ TẢI FILE MP3",
-                                data=file_bytes,
-                                file_name=f"audio_{datetime.now().strftime('%H%M%S')}.mp3",
-                                mime="audio/mpeg"
-                            )
-                        
-                        # Lưu lịch sử (Nếu có hàm này)
+                        st.download_button(
+                            label="⬇️ TẢI FILE MP3",
+                            data=file_bytes,
+                            file_name=f"audio_{datetime.now().strftime('%H%M%S')}.mp3",
+                            mime="audio/mpeg"
+                        )
+
                         try:
                             luu_lich_su_vinh_vien("Tạo Audio", selected_label, input_text[:50])
-                        except: pass
-                        
+                        except:
+                            pass
+
                     except Exception as e:
                         st.error(f"❌ Lỗi: {str(e)}")
-                        st.info("💡 Mẹo: Nếu lỗi 'No audio', hãy thử đổi giọng khác hoặc cắt ngắn văn bản.")
+                        st.info(
+                            "💡 Nếu lỗi 'No audio was received', hãy thử:\n"
+                            "- Rút ngắn nội dung.\n"
+                            "- Tránh chỉ dùng ký tự đặc biệt/dấu chấm.\n"
+                            "- Đổi sang giọng khác.\n"
+                            "- Kiểm tra kết nối mạng/VPN/Proxy."
+                        )
+
                     
     # === TAB 5: LỊCH SỬ ===
     with tab5:
