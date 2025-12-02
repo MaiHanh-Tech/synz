@@ -11,7 +11,8 @@ import os
 import gspread 
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import plotly.express as px # Thư viện vẽ biểu đồ
+import plotly.express as px
+import markdown 
 
 # --- 1. CẤU HÌNH TRANG ---
 st.set_page_config(page_title="Mai Hanh Super App", layout="wide", page_icon="💎")
@@ -116,7 +117,7 @@ def doc_file(uploaded_file):
     except: return ""
     return ""
 
-# --- 5. GIAO DIỆN CHÍNH (ĐÃ SỬA TAB 1 & TAB 2) ---
+# --- 5. GIAO DIỆN CHÍNH ---
 def show_main_app():
     # Load history
     if 'history_loaded' not in st.session_state:
@@ -127,11 +128,11 @@ def show_main_app():
     if 'history' not in st.session_state: st.session_state.history = []
     if 'chat_history' not in st.session_state: st.session_state.chat_history = []
 
-    # Cấu hình Gemini Thông Minh (Tự động chọn Model)
+    # Cấu hình Gemini
     try:
         sys_api_key = st.secrets["system"]["gemini_api_key"]
         genai.configure(api_key=sys_api_key)
-        # Thử lần lượt các model
+        # Logic tự động chọn Model
         try:
             model = genai.GenerativeModel('gemini-2.5-pro')
         except:
@@ -153,11 +154,10 @@ def show_main_app():
     st.title("💎 The Mai Hanh Super-App")
     tab1, tab2, tab3, tab4 = st.tabs(["📚 Phân Tích Sách", "✍️ Dịch Giả", "🗣️ Tranh Biện", "⏳ Lịch Sử"])
 
-    # === TAB 1: PHÂN TÍCH SÁCH (FULL WIDTH + BIỂU ĐỒ) ===
+    # === TAB 1: PHÂN TÍCH SÁCH ===
     with tab1:
         st.header("Trợ lý Nghiên cứu RAG")
         
-        # Phần Upload (Gọn gàng)
         with st.container():
             c1, c2, c3 = st.columns([1, 1, 1])
             with c1:
@@ -171,23 +171,20 @@ def show_main_app():
         
         st.divider()
 
-        # Phần Xử lý & Kết quả
         if btn_run and uploaded_files:
             vec_model = load_models()
             db_vec, df = None, None
             has_db = False
             
-            # Xử lý Excel
             if file_excel:
                 try:
                     df = pd.read_excel(file_excel).dropna(subset=['Tên sách'])
                     content = [f"{r['Tên sách']} {str(r.get('CẢM NHẬN',''))}" for i,r in df.iterrows()]
                     db_vec = vec_model.encode(content)
                     has_db = True
-                    st.success(f"✅ Đã kết nối {len(df)} cuốn sách từ kho dữ liệu.")
+                    st.success(f"✅ Đã kết nối {len(df)} cuốn sách.")
                 except: st.error("Lỗi đọc Excel.")
 
-            # Chạy từng file
             for f in uploaded_files:
                 text = doc_file(f)
                 lien_ket = ""
@@ -208,7 +205,7 @@ def show_main_app():
                     st.markdown("---")
                     luu_lich_su_vinh_vien("Phân Tích", f.name, res.text)
 
-        # Phần Biểu đồ (Luôn hiện nếu có Excel)
+        # Biểu đồ
         if file_excel:
             try:
                 if 'df_viz' not in st.session_state:
@@ -228,57 +225,67 @@ def show_main_app():
                             st.plotly_chart(px.histogram(df_v, x='Len', title="Độ sâu Review"), use_container_width=True)
             except: pass
 
-    # === TAB 2: DỊCH GIẢ (KHÔNG CHIA CỘT + DOWNLOAD HTML) ===
+    # === TAB 2: DỊCH GIẢ (CÓ NÚT CHỌN STYLE + DOWNLOAD) ===
     with tab2:
         st.header("Dịch Thuật Đa Chiều")
         
-        # Input full width
-        txt_in = st.text_area("Nhập văn bản cần dịch (Tự động nhận diện ngôn ngữ):", height=150)
+        # 1. Nhập liệu
+        txt_in = st.text_area("Nhập văn bản cần dịch:", height=150, placeholder="Dán tiếng Việt, Anh hoặc Trung vào đây...")
         
-        if st.button("✍️ Dịch & Phân Tích Ngay", type="primary"):
-            if txt_in:
-                with st.spinner("AI đang tư duy..."):
-                    prompt = f"""
-                    Bạn là Chuyên gia Ngôn ngữ. Hãy xử lý văn bản sau: "{txt_in}"
-                    
-                    YÊU CẦU:
-                    1. Nếu là Tiếng Việt -> Dịch sang Tiếng Anh (Hàn lâm) và Tiếng Trung (Kèm Pinyin).
-                    2. Nếu là Ngoại ngữ -> Dịch sang Tiếng Việt (Văn phong mượt mà).
-                    3. Phân tích 3 từ vựng/cấu trúc ngữ pháp đắt giá nhất trong văn bản.
-                    
-                    TRÌNH BÀY: Dùng Markdown rõ ràng.
-                    """
-                    res = model.generate_content(prompt)
-                    
-                    # Hiện kết quả Full Width
-                    st.markdown("### 🎯 Kết Quả:")
-                    st.markdown(res.text)
-                    
-                    # Tạo nội dung HTML để download
-                    html_content = f"""
-                    <html>
-                    <head><style>body {{ font-family: sans-serif; padding: 20px; line-height: 1.6; }}</style></head>
-                    <body>
-                        <h2>Bản Dịch & Phân Tích</h2>
-                        <div style="background: #f0f2f6; padding: 15px; border-radius: 5px;">
-                            <strong>Gốc:</strong><br>{txt_in}
-                        </div>
-                        <hr>
-                        {markdown.markdown(res.text)} <!-- Cần import markdown nếu muốn đẹp hơn, hoặc để text thô -->
-                    </body>
-                    </html>
-                    """
-                    # Nút Download
-                    st.download_button(
-                        label="💾 Tải kết quả (HTML)",
-                        data=html_content,
-                        file_name="Ban_Dich.html",
-                        mime="text/html"
-                    )
-                    
-                    luu_lich_su_vinh_vien("Dịch Thuật", txt_in[:30], res.text)
-            else:
-                st.warning("Vui lòng nhập văn bản!")
+        # 2. Chọn văn phong (ĐÃ THÊM LẠI THEO YÊU CẦU CỦA GIÁM ĐỐC)
+        c_opt, c_btn = st.columns([3, 1])
+        with c_opt:
+            style_opt = st.selectbox(
+                "Chọn Phong Cách Dịch:",
+                ["Mặc định (Trung tính)", "Hàn lâm/Học thuật", "Văn học/Cảm xúc", "Đời thường/Dễ hiểu", "Thương mại/Kinh tế", "Kiếm hiệp/Cổ trang"]
+            )
+        with c_btn:
+            st.write("") # Căn lề
+            st.write("")
+            btn_trans = st.button("✍️ Dịch Ngay", type="primary", use_container_width=True)
+        
+        if btn_trans and txt_in:
+            with st.spinner("AI đang tư duy..."):
+                prompt = f"""
+                Bạn là Chuyên gia Ngôn ngữ. Hãy xử lý văn bản sau: "{txt_in}"
+                
+                YÊU CẦU:
+                1. Tự động nhận diện ngôn ngữ nguồn.
+                2. Nếu là Tiếng Việt -> Dịch sang Tiếng Anh và Tiếng Trung (Kèm Pinyin).
+                3. Nếu là Ngoại ngữ -> Dịch sang Tiếng Việt.
+                4. **PHONG CÁCH DỊCH: {style_opt}** (Quan trọng).
+                5. Phân tích 3 từ vựng/cấu trúc hay nhất.
+                
+                TRÌNH BÀY: Dùng Markdown rõ ràng.
+                """
+                res = model.generate_content(prompt)
+                
+                # Hiện kết quả
+                st.markdown("### 🎯 Kết Quả:")
+                st.markdown(res.text)
+                
+                # Nút Download HTML
+                html_content = f"""
+                <html>
+                <head><style>body {{ font-family: sans-serif; padding: 20px; line-height: 1.6; }}</style></head>
+                <body>
+                    <h2>Bản Dịch ({style_opt})</h2>
+                    <div style="background: #f0f2f6; padding: 15px; border-radius: 5px;">
+                        <strong>Gốc:</strong><br>{txt_in}
+                    </div>
+                    <hr>
+                    {markdown.markdown(res.text)}
+                </body>
+                </html>
+                """
+                st.download_button(
+                    label="💾 Tải kết quả (HTML)",
+                    data=html_content,
+                    file_name="Ban_Dich.html",
+                    mime="text/html"
+                )
+                
+                luu_lich_su_vinh_vien("Dịch Thuật", f"{style_opt}: {txt_in[:20]}...", res.text)
 
     # === TAB 3: TRANH BIỆN ===
     with tab3:
@@ -329,5 +336,4 @@ def main():
         show_main_app()
 
 if __name__ == "__main__":
-    import markdown # Import thêm ở đây để dùng cho nút Download HTML
     main()
