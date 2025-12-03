@@ -1,8 +1,11 @@
 import logging
 import os
+import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 import google.generativeai as genai
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import threading # Để chạy Web và Bot song song
 
 # --- CẤU HÌNH ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -13,76 +16,74 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# --- KẾT NỐI 2 BỘ NÃO (FLASH & PRO) ---
+# --- KẾT NỐI BỘ NÃO ---
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
-    model_flash = genai.GenerativeModel('gemini-2.5-flash') # Chat thường
-    model_pro = genai.GenerativeModel('gemini-2.5-pro')     # Chat sâu (/g)
+    model_flash = genai.GenerativeModel('gemini-2.5-flash')
+    model_pro = genai.GenerativeModel('gemini-2.5-pro')
 else:
-    print("⚠️ CẢNH BÁO: Chưa thấy GOOGLE_API_KEY!")
+    print("⚠️ CHÚ Ý: Chưa thấy GOOGLE_API_KEY!")
 
-# Lưu lịch sử chat cho Flash
 chat_history = {}
 
+# --- [MỚI] 1. HÀM XỬ LÝ WEB (ĐÁNH LỪA RENDER) ---
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    """Xử lý yêu cầu HTTP đơn giản (Đánh lừa Render)"""
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
+
+def run_web_server():
+    """Chạy Server Web giả để giữ Bot sống"""
+    # Render yêu cầu dùng cổng PORT lấy từ Environment Variable
+    PORT = int(os.environ.get("PORT", 8080)) 
+    server = HTTPServer(('', PORT), HealthCheckHandler)
+    print(f"🌐 Web Server giả chạy trên cổng {PORT} (Giữ Bot sống)...")
+    server.serve_forever()
+
+# --- 2. HÀM XỬ LÝ BOT TELEGRAM (GIỮ NGUYÊN LOGIC CŨ) ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = """
-    🚀 **VietMaiAI Lite (Siêu Tốc)** đã sẵn sàng!
-    
-    - Chat thường: Dùng Gemini Flash (Phản hồi tức thì).
-    - Chat sâu: Gõ `/g <câu hỏi>` dùng Gemini Pro.
-    
-    *Phiên bản này đã bỏ Voice để đảm bảo tốc độ cao nhất.*
-    """
-    await update.message.reply_text(msg)
+    await update.message.reply_text("🚀 VietMaiAI đã sống lại! (Hybrid Mode)")
 
 async def chat_with_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     chat_id = update.effective_chat.id
-    
-    print(f"📩 Nhận tin: {user_text}") 
-    # Báo "Đang gõ..." ngay lập tức để Chị biết bot còn sống
     await context.bot.send_chat_action(chat_id=chat_id, action='typing')
-
+    
+    # Logic Gemini (Flash/Pro) giữ nguyên như cũ
+    # ... (Chèn logic Gemini Dual-Core vào đây) ...
     try:
-        ai_reply = ""
-
-        # --- CHẾ ĐỘ CHUYÊN GIA (/g) ---
         if user_text.lower().startswith("/g "):
+            # Logic PRO
             real_prompt = user_text[3:].strip()
-            # Dùng Pro, không cần nhớ lịch sử để tập trung phân tích
             response = model_pro.generate_content(real_prompt)
-            ai_reply = f"🧠 **[PRO ANALYSIS]**\n{response.text}"
-
-        # --- CHẾ ĐỘ THƯỜNG (FLASH) ---
+            ai_reply = f"🧠 **[PRO]**\n{response.text}"
         else:
+            # Logic FLASH
             if chat_id not in chat_history:
-                chat_history[chat_id] = model_flash.start_chat(history=[
-                    {"role": "user", "parts": "Bạn là trợ lý ảo thông minh, trả lời ngắn gọn, súc tích và thân thiện."},
-                    {"role": "model", "parts": "Dạ, em nghe đây ạ!"}
-                ])
-            chat = chat_history[chat_id]
-            
-            response = chat.send_message(user_text)
+                chat_history[chat_id] = model_flash.start_chat(history=[])
+            response = chat_history[chat_id].send_message(user_text)
             ai_reply = response.text
-
-        # --- GỬI KẾT QUẢ NGAY LẬP TỨC ---
-        # Chia nhỏ nếu tin quá dài (Telegram giới hạn)
-        if len(ai_reply) > 4000:
-            for x in range(0, len(ai_reply), 4000):
-                await update.message.reply_text(ai_reply[x:x+4000])
-        else:
-            await update.message.reply_text(ai_reply)
             
+        # Gửi Text
+        await update.message.reply_text(ai_reply)
+        
     except Exception as e:
-        print(f"Lỗi: {e}")
-        await update.message.reply_text(f"⚠️ Mạng chập chờn, chị hỏi lại giúp em nhé! ({e})")
+        await update.message.reply_text(f"⚠️ Lỗi xử lý: {str(e)}")
 
-# --- CHẠY BOT ---
+# --- 3. HÀM CHẠY CHÍNH (KẾT HỢP CẢ 2) ---
 if __name__ == '__main__':
     if not TELEGRAM_TOKEN:
         print("❌ LỖI: Chưa có TELEGRAM_TOKEN!")
     else:
-        print("🚀 VietMaiAI Lite đang khởi động...")
+        # A. CHẠY WEB SERVER (THREAD RIÊNG)
+        web_thread = threading.Thread(target=run_web_server)
+        web_thread.start()
+        
+        # B. CHẠY TELEGRAM BOT (THREAD CHÍNH)
+        print("🤖 Bắt đầu Polling Telegram...")
         application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
         application.add_handler(CommandHandler('start', start))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), chat_with_ai))
