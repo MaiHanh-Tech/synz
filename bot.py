@@ -19,7 +19,7 @@ logging.basicConfig(
 # --- KẾT NỐI BỘ NÃO ---
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
-    model_flash = genai.GenerativeModel('gemini-2.5-flash')
+    model_flash = genai.GenerativeModel('gemini-2.5-pro')
     model_pro = genai.GenerativeModel('gemini-2.5-pro')
 else:
     print("⚠️ CHÚ Ý: Chưa thấy GOOGLE_API_KEY!")
