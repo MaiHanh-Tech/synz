@@ -19,11 +19,13 @@ import json
 import re
 from streamlit_agraph import agraph, Node, Edge, Config
 import sys
+
+# Fix lỗi asyncio trên Windows (nếu chạy local)
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # --- 1. CẤU HÌNH TRANG ---
-st.set_page_config(page_title="🕸️ The Cognitive Weaver", layout="wide", page_icon="💎")
+st.set_page_config(page_title="The Cognitive Weaver", layout="wide", page_icon="💎")
 
 # ==========================================
 # 🌍 BỘ TỪ ĐIỂN ĐA NGÔN NGỮ (I18N)
@@ -54,10 +56,11 @@ TRANS = {
         "t1_connect_ok": "✅ Đã kết nối {n} cuốn sách.",
         "t1_analyzing": "Đang phân tích {name}...",
         "t1_graph_title": "🪐 Vũ Trụ Sách",
-        # Tab 2
+        # Tab 2 (Đã sửa lại key cho phù hợp logic mới)
         "t2_header": "Dịch Thuật Đa Chiều",
         "t2_input": "Nhập văn bản cần dịch:",
-        "t2_style": "Chọn Phong Cách Dịch:",
+        "t2_target": "Dịch sang:",
+        "t2_style": "Phong cách:",
         "t2_btn": "✍️ Dịch Ngay",
         "t2_styles": ["Mặc định", "Hàn lâm/Học thuật", "Văn học/Cảm xúc", "Đời thường", "Kinh tế", "Kiếm hiệp"],
         # Tab 3
@@ -105,7 +108,8 @@ TRANS = {
         # Tab 2
         "t2_header": "Multidimensional Translator",
         "t2_input": "Enter text to translate:",
-        "t2_style": "Translation Style:",
+        "t2_target": "Translate to:",
+        "t2_style": "Style:",
         "t2_btn": "✍️ Translate",
         "t2_styles": ["Default", "Academic", "Literary/Emotional", "Casual", "Business", "Wuxia/Martial Arts"],
         # Tab 3
@@ -153,7 +157,8 @@ TRANS = {
         # Tab 2
         "t2_header": "多维翻译",
         "t2_input": "输入文本:",
-        "t2_style": "翻译风格:",
+        "t2_target": "翻译成:",
+        "t2_style": "风格:",
         "t2_btn": "✍️ 翻译",
         "t2_styles": ["默认", "学术", "文学/情感", "日常", "商业", "武侠"],
         # Tab 3
@@ -179,8 +184,6 @@ TRANS = {
 def T(key):
     lang = st.session_state.get('lang', 'vi')
     return TRANS[lang].get(key, key)
-
-# ==========================================
 
 # --- 2. CLASS QUẢN LÝ MẬT KHẨU ---
 class PasswordManager:
@@ -389,95 +392,79 @@ def show_main_app():
                     st.markdown(f"### 📄 {f.name}"); st.markdown(res.text); st.markdown("---")
                     luu_lich_su_vinh_vien("Phân Tích Sách", f.name, res.text)
 
-        # --- VISUALIZATION & GRAPH (NÂNG CẤP XỬ LÝ 1000+ SÁCH) ---
+        # Graph
         if file_excel:
             try:
-                if "df_viz" not in st.session_state:
-                    st.session_state.df_viz = pd.read_excel(file_excel).dropna(subset=["Tên sách"])
+                if "df_viz" not in st.session_state: st.session_state.df_viz = pd.read_excel(file_excel).dropna(subset=["Tên sách"])
                 df_v = st.session_state.df_viz
                 
-                # Tính toán Vector (Chỉ làm 1 lần)
-                vec_model = load_models()
-                if "book_embs" not in st.session_state:
-                    with st.spinner(f"Đang số hóa {len(df_v)} cuốn sách..."):
-                        contents = [f"{r['Tên sách']} {str(r.get('CẢM NHẬN',''))}" for _, r in df_v.iterrows()]
-                        st.session_state.book_embs = vec_model.encode(contents)
-                        st.session_state.book_titles = df_v["Tên sách"].tolist()
-
-                embs = st.session_state.book_embs
-                titles = st.session_state.book_titles
-                total_books = len(titles)
-
-                st.divider()
-                st.subheader(f"🪐 Vũ Trụ Tri Thức ({total_books} cuốn)")
-                
-                # --- LỰA CHỌN CHẾ ĐỘ XEM ---
-                view_mode = st.radio("Chọn chế độ hiển thị:", 
-                                     ["🌌 Bản Đồ Sao (Scatter - Tốt cho >100 sách)", 
-                                      "🕸️ Mạng Lưới (Network - Tốt cho <100 sách)"], 
-                                     horizontal=True)
-
-                # CHẾ ĐỘ 1: BẢN ĐỒ SAO (SCATTER PLOT) - XỬ LÝ ĐƯỢC 1000+ SÁCH
-                if "Scatter" in view_mode:
-                    from sklearn.decomposition import PCA
+                with st.expander(T("t1_graph_title"), expanded=False):
+                    vec = load_models()
+                    if "book_embs" not in st.session_state:
+                        with st.spinner("Đang số hóa sách..."):
+                            st.session_state.book_embs = vec.encode(df_v["Tên sách"].tolist())
                     
-                    # Giảm chiều dữ liệu từ 384 -> 2 chiều để vẽ
-                    pca = PCA(n_components=2)
-                    coords = pca.fit_transform(embs)
-                    
-                    # Tạo Dataframe cho biểu đồ
-                    df_plot = pd.DataFrame(coords, columns=['x', 'y'])
-                    df_plot['Tên sách'] = titles
-                    df_plot['Tác giả'] = df_v['Tác giả'].tolist() if 'Tác giả' in df_v.columns else ["Unknown"]*len(titles)
-                    
-                    fig = px.scatter(
-                        df_plot, x='x', y='y', 
-                        hover_name='Tên sách', color='Tác giả',
-                        title=f"Bản đồ tư duy {total_books} cuốn sách",
-                        height=700
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                    st.info("💡 Mẹo: Các chấm đứng gần nhau là các sách có nội dung tương đồng. Rê chuột vào để xem tên.")
-
-                # CHẾ ĐỘ 2: MẠNG LƯỚI (NETWORK) - CŨ NHƯNG MỞ KHÓA LIMIT
-                else:
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        # MỞ KHÓA: Max value là tổng số sách chị có
-                        max_nodes = st.slider("Số lượng hiển thị:", 5, total_books, min(50, total_books))
-                    with c2:
-                        threshold = st.slider("Độ tương đồng nối dây:", 0.0, 1.0, 0.45)
-
-                    sim_matrix = cosine_similarity(embs)
+                    embs = st.session_state.book_embs
+                    sim = cosine_similarity(embs)
                     nodes, edges = [], []
                     
-                    # Chỉ lấy số lượng sách theo Slider
-                    for i in range(max_nodes):
-                        nodes.append(Node(id=str(i), label=titles[i], size=20, color="#FFD166"))
-                        for j in range(i+1, max_nodes):
-                            if sim_matrix[i,j] > threshold:
-                                edges.append(Edge(source=str(i), target=str(j), color="#118AB2"))
+                    # Graph Config
+                    total_books = len(df_v)
+                    c_slider1, c_slider2 = st.columns(2)
+                    with c_slider1: max_nodes = st.slider("Số lượng sách hiển thị:", 5, total_books, min(50, total_books))
+                    with c_slider2: threshold = st.slider("Độ tương đồng nối dây:", 0.0, 1.0, 0.45)
 
+                    for i in range(max_nodes):
+                        nodes.append(Node(id=str(i), label=df_v.iloc[i]["Tên sách"], size=20, color="#FFD166"))
+                        for j in range(i+1, max_nodes):
+                            if sim[i,j]>threshold: edges.append(Edge(source=str(i), target=str(j), color="#118AB2"))
+                    
                     config = Config(width=900, height=600, directed=False, physics=True, collapsible=False)
                     agraph(nodes, edges, config)
+            except: pass
 
-            except Exception as e:
-                st.warning(f"Đang xử lý dữ liệu biểu đồ... ({e})")
-
-    # TAB 2: DỊCH
+    # TAB 2: DỊCH (ĐÃ SỬA: CHỌN NGÔN NGỮ ĐÍCH + FULL WIDTH)
     with tab2:
         st.header(T("t2_header"))
-        txt = st.text_area(T("t2_input"), height=150)
-        c_opt, c_btn = st.columns([3, 1])
-        with c_opt: style = st.selectbox(T("t2_style"), T("t2_styles"))
+        
+        # 1. Input tràn màn hình
+        txt = st.text_area(T("t2_input"), height=150, placeholder="Dán văn bản vào đây (Anh/Việt/Trung)...")
+        
+        # 2. Các nút chọn nằm trên 1 hàng
+        c_lang, c_style, c_btn = st.columns([1, 1, 1])
+        with c_lang:
+            target_lang = st.selectbox(T("t2_target"), ["Tiếng Việt", "English", "中文 (Chinese)", "French", "Japanese"])
+        with c_style:
+            style = st.selectbox(T("t2_style"), T("t2_styles"))
         with c_btn: 
             st.write(""); st.write("")
-            if st.button(T("t2_btn"), type="primary", use_container_width=True) and txt:
-                with st.spinner("AI..."):
-                    prompt = f"Translate & Analyze: '{txt}'. Target Lang: {st.session_state.lang}. Style: {style}."
-                    res = model.generate_content(prompt)
-                    st.markdown(res.text)
-                    luu_lich_su_vinh_vien("Dịch Thuật", txt[:20], res.text)
+            btn_trans = st.button(T("t2_btn"), type="primary", use_container_width=True)
+
+        # 3. Xử lý & Hiển thị kết quả (Tràn màn hình)
+        if btn_trans and txt:
+            with st.spinner("AI đang xử lý..."):
+                prompt = f"""
+                Bạn là Chuyên gia Ngôn ngữ.
+                Nhiệm vụ: Dịch và phân tích văn bản sau.
+                
+                YÊU CẦU:
+                1. Ngôn ngữ đích: {target_lang}.
+                2. Phong cách: {style}.
+                3. QUAN TRỌNG: Nếu dịch sang TIẾNG TRUNG, bắt buộc cung cấp: Chữ Hán, Pinyin (có dấu), và Nghĩa Hán Việt.
+                4. Phân tích 3 từ vựng/cấu trúc hay nhất.
+                
+                Văn bản gốc: "{txt}"
+                """
+                res = model.generate_content(prompt)
+                
+                st.markdown("---")
+                st.markdown(res.text)
+                
+                # Nút tải HTML
+                html_content = f"<html><body><h2>Translation</h2><p><b>Original:</b> {txt}</p><hr>{markdown.markdown(res.text)}</body></html>"
+                st.download_button("💾 Download HTML", html_content, "translation.html", "text/html")
+                
+                luu_lich_su_vinh_vien("Dịch Thuật", f"{target_lang}: {txt[:20]}...", res.text)
 
     # TAB 3: TRANH BIỆN
     with tab3:
@@ -507,10 +494,17 @@ def show_main_app():
             st.session_state.chat_history.append({"role":"assistant", "content":res.text})
             luu_lich_su_vinh_vien("Tranh Biện", f"Vs {p_sel}: {q}", res.text)
 
-    # TAB 4: TTS
+    # TAB 4: TTS (ĐÃ CÓ LẠI GIỌNG NỮ)
     with tab4:
         st.header(T("t4_header"))
-        v_opt = {"🇻🇳 Nam Minh": "vi-VN-NamMinhNeural", "🇺🇸 Andrew": "en-US-AndrewMultilingualNeural", "🇨🇳 Yunjian": "zh-CN-YunjianNeural"}
+        v_opt = {
+            "🇻🇳 VN - Nam (Nam Minh)": "vi-VN-NamMinhNeural", 
+            "🇻🇳 VN - Nữ (Hoài My)": "vi-VN-HoaiMyNeural",
+            "🇺🇸 US - Nam (Andrew)": "en-US-AndrewMultilingualNeural",
+            "🇺🇸 US - Nữ (Emma)": "en-US-EmmaNeural",
+            "🇨🇳 CN - Nam (Yunjian)": "zh-CN-YunjianNeural",
+            "🇨🇳 CN - Nữ (Xiaoyi)": "zh-CN-XiaoyiNeural"
+        }
         c1, c2 = st.columns([3,1])
         with c2: 
             v_sel = st.selectbox(T("t4_voice"), list(v_opt.keys()))
