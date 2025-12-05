@@ -493,12 +493,12 @@ def show_main_app():
                 height=100
             )
 
-        # 2. CHỌN ĐẤU THỦ VÀ THỨ TỰ
+        # 2. CHỌN ĐẤU THỦ VÀ THỨ TỰ (Dùng Key mới để tránh Cache)
         selected_debaters = st.multiselect(
             "Chọn các Triết gia tham chiến (Chọn theo thứ tự muốn họ phát biểu):", 
             list(personas.keys()), 
-            # Đã sửa lại default để chứa các nhân vật triết học chính
-            default=["Immanuel Kant (The Rationalist)", "Friedrich Nietzsche (The Vitalist)", "Phật Tổ (The Awakened One)", "😈 Devil's Advocate"]
+            default=["Immanuel Kant (The Rationalist)", "Friedrich Nietzsche (The Vitalist)", "Phật Tổ (The Awakened One)", "😈 Devil's Advocate"],
+            key="final_debaters_list_v1" # Thêm key để buộc widget tải lại
         )
 
         with c_btn:
