@@ -524,7 +524,30 @@ def show_main_app():
                     st.session_state.chat_history.append({"role":"assistant", "content":res.text})
                     luu_lich_su_vinh_vien("Tranh Biện Solo", f"Vs {p_sel}", q)
                 except Exception as e: st.error(f"Lỗi AI: {e}")
-
+                
+# --- CHẾ ĐỘ 1: SOLO (ĐÃ SỬA) ---
+        if mode == "👤 Đấu Solo":
+            # ... (Phần code trên giữ nguyên) ...
+            
+            # Input
+            if q := st.chat_input(T("t3_input")):
+                st.chat_message("user").markdown(q)
+                st.session_state.chat_history.append({"role":"user", "content":q})
+                
+                # Logic gọi AI
+                # ... (code gọi AI giữ nguyên) ...
+                
+                try:
+                    res = model.generate_content(prompt)
+                    st.chat_message("assistant").markdown(res.text)
+                    st.session_state.chat_history.append({"role":"assistant", "content":res.text})
+                    
+                    # <<< DÒNG CODE CẦN THÊM ĐỂ LƯU VĨNH VIỄN >>>
+                    luu_lich_su_vinh_vien("Tranh Biện Solo", f"Vs {p_sel}: {q}", res.text) 
+                    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                    
+                except Exception as e: st.error(f"Lỗi AI: {e}")
+                
         # --- CHẾ ĐỘ 2: ĐẠI CHIẾN (ĐÃ TĂNG VÒNG LẶP LÊN 3) ---
         else:
             st.info("💡 Hướng dẫn: Chọn 2-3 triết gia, đặt chủ đề và xem họ 'đấu võ mồm'.")
@@ -582,7 +605,7 @@ def show_main_app():
                             time.sleep(1) 
 
                     status.update(label="✅ Tranh luận kết thúc! (Đã chạy 3 vòng)", state="complete")
-                    luu_lich_su_vinh_vien("Hội Đồng Tranh Biện", topic, "Chi tiết trong logs")
+                    luu_lich_su_vinh_vien("Hội Đồng Tranh Biện", topic, "\n".join(st.session_state.battle_logs))
 
             # Hiển thị kết quả trận đấu
             for log in st.session_state.battle_logs:
