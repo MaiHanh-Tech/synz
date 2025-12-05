@@ -466,33 +466,114 @@ def show_main_app():
                 
                 luu_lich_su_vinh_vien("Dịch Thuật", f"{target_lang}: {txt[:20]}...", res.text)
 
-    # TAB 3: TRANH BIỆN
+    # TAB 3: TRANH BIỆN (ĐÃ NÂNG CẤP LÊN CHẾ ĐỘ HỘI NGHỊ BÀN TRÒ)
     with tab3:
         st.header(T("t3_header"))
-        # Chọn Persona
+        st.subheader("🏛️ Hội Nghị Bàn Tròn Triết Học")
+        
+        # --- ĐỊNH NGHĨA CÁC TRIẾT GIA (8 NHÂN VẬT) ---
+        # Chị có thể thêm/bớt nhân vật và điều chỉnh prompt ở đây
         personas = {
-            "😈 Devil's Advocate": "Nhà phê bình khắc nghiệt/Critical critic",
             "🤔 Socrates": "Triết gia Socrates (chỉ hỏi/only ask)",
             "📈 Economist": "Nhà kinh tế học/Economist",
             "🚀 Steve Jobs": "Tầm nhìn đột phá/Visionary",
-            "❤️ Empath": "Người tri kỷ/Empathetic friend"
+            "❤️ Empath": "Người tri kỷ/Empathetic friend",
+            "Immanuel Kant (The Rationalist)": """
+            Bạn là Immanuel Kant, đại diện cho Lý tính thuần túy. Tư duy: Đề cao quy luật, nghĩa vụ, và sự kiểm soát cảm xúc. Phản ứng: Điềm tĩnh, phân tích.
+            """,
+            "Friedrich Nietzsche (The Vitalist)": """
+            Bạn là Friedrich Nietzsche, đại diện cho Ý chí quyền lực và bản năng sống mãnh liệt. Tư duy: Phá vỡ quy tắc, chê bai sự yếu đuối. Phản ứng: Khiêu khích, thơ ca, đầy lửa.
+            """,
+            "Phật Tổ (The Awakened One)": """
+            Bạn là Đức Phật (không tôn giáo). Nhìn mọi vấn đề dưới lăng kính Vô ngã, Duyên khởi, Vô thường. Phản ứng: Từ bi, giải cấu trúc sự chấp trước.
+            """
         }
-        col_p, col_c = st.columns([3,1])
-        with col_p: p_sel = st.selectbox(T("t3_persona_label"), list(personas.keys()))
-        with col_c: 
-            st.write(""); st.write("")
-            if st.button(T("t3_clear"), use_container_width=True): st.session_state.chat_history = []; st.rerun()
+        
+        # 1. GIAO DIỆN NHẬP LIỆU
+        c_topic, c_btn = st.columns([3, 1])
+        with c_topic:
+            topic = st.text_area(
+                "Chủ đề Tranh luận (Topic):", 
+                "Tại sao con người lại sợ hãi sự gắn kết cảm xúc, và giải pháp triết học cho nỗi sợ này là gì?",
+                height=100
+            )
 
-        for m in st.session_state.chat_history: st.chat_message(m["role"]).markdown(m["content"])
-        if q := st.chat_input(T("t3_input")):
-            st.chat_message("user").markdown(q)
-            st.session_state.chat_history.append({"role":"user", "content":q})
-            
-            full_p = f"Role: {personas[p_sel]}. Language: {st.session_state.lang}. User said: '{q}'."
-            res = model.generate_content(full_p)
-            st.chat_message("assistant").markdown(res.text)
-            st.session_state.chat_history.append({"role":"assistant", "content":res.text})
-            luu_lich_su_vinh_vien("Tranh Biện", f"Vs {p_sel}: {q}", res.text)
+        # 2. CHỌN ĐẤU THỦ VÀ THỨ TỰ
+        selected_debaters = st.multiselect(
+            "Chọn các Triết gia tham chiến (Chọn theo thứ tự muốn họ phát biểu):", 
+            list(personas.keys()), 
+            default=["Immanuel Kant (The Rationalist)", "Friedrich Nietzsche (The Vitalist)", "Phật Tổ (The Awakened One)", "😈 Devil's Advocate"]
+        )
+
+        with c_btn:
+            st.write(""); st.write(""); st.write("")
+            btn_start = st.button("🔥 KHỞI ĐỘNG TRANH BIỆN 🔥", type="primary", use_container_width=True)
+            if st.button("🗑️ Xóa Lịch sử Chat", use_container_width=True): st.session_state.debate_history = []; st.rerun()
+
+        st.divider()
+
+        # Khởi tạo lịch sử tranh biện
+        if 'debate_history' not in st.session_state:
+            st.session_state.debate_history = []
+        
+        # 3. HIỂN THỊ LỊCH SỬ CHAT
+        for item in st.session_state.debate_history: 
+            st.markdown(item["content"]) # Hiển thị đã được định dạng Markdown
+
+        # 4. XỬ LÝ KHI BẤM NÚT BẮT ĐẦU TRANH BIỆN
+        if btn_start:
+            if len(selected_debaters) < 2:
+                st.warning("Vui lòng chọn ít nhất hai Triết gia để bắt đầu cuộc chiến!")
+            elif not topic:
+                st.warning("Vui lòng nhập chủ đề tranh luận.")
+            else:
+                st.session_state.debate_history = [] # Reset lịch sử cho cuộc tranh luận mới
+                debate_log = "" # Log nội dung cho AI
+                
+                with st.container():
+                    # Vòng lặp: Cho từng nhân vật nói
+                    for role in selected_debaters:
+                        with st.spinner(f"**{role}** đang suy ngẫm để 'chiếu tướng' đối thủ..."):
+                            
+                            system_instruction = personas[role]
+                            
+                            # TẠO PROMPT KẾT NỐI (Lịch sử cuộc họp là Context)
+                            debate_prompt = f"""
+                            VAI TRÒ CỦA BẠN:
+                            {system_instruction}
+                            
+                            CHỦ ĐỀ TRANH LUẬN: "{topic}"
+                            
+                            LỊCH SỬ TRANH LUẬN ĐẾN HIỆN TẠI:
+                            {debate_log}
+                            
+                            YÊU CẦU:
+                            1. Bắt đầu bằng tên của bạn (ví dụ: **Kant:**).
+                            2. Phản biện, đồng tình hoặc mở rộng quan điểm của người nói ngay trước bạn (nếu có).
+                            3. Giữ đúng giọng điệu và thuật ngữ triết học của nhân vật bạn.
+                            4. Đưa ra lập luận sắc sảo, không quá dài (tối đa 4-5 dòng).
+                            """
+                            
+                            try:
+                                model = genai.GenerativeModel('gemini-1.5-flash')
+                                response = model.generate_content(debate_prompt)
+                                text_reply = response.text
+                                
+                                # Lưu và Hiển thị nội dung
+                                formatted_reply = f"**{role}**:\n{text_reply}\n\n---\n"
+                                st.markdown(formatted_reply)
+                                
+                                # Cập nhật vào lịch sử để người sau đọc được
+                                debate_log += f"\n[{role} đã nói]: {text_reply}"
+                                st.session_state.debate_history.append({"role": role, "content": formatted_reply})
+
+                            except Exception as e:
+                                st.error(f"Lỗi rồi: {e}")
+                
+                # Lưu toàn bộ log tranh luận vào DB
+                luu_lich_su_vinh_vien("Hội Nghị Bàn Tròn", topic, debate_log)
+                st.success("Cuộc tranh biện kết thúc. Ai thắng, ai thua, tự bạn quyết định! 😉")
+    
 
     # TAB 4: TTS (ĐÃ CÓ LẠI GIỌNG NỮ)
     with tab4:
