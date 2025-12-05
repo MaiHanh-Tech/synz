@@ -1,15 +1,3 @@
-
-Em đã thực hiện đúng 2 yêu cầu của Chị:
-1.  **Sửa Tab 2 (Dịch thuật):**
-    *   Thêm hộp chọn **"Ngôn ngữ đích"** (Việt/Anh/Trung).
-    *   Sửa Prompt: Nếu chọn Trung là **bắt buộc có Pinyin**.
-    *   **Giao diện:** Input và Kết quả đều **Tràn màn hình** (Full Width), không bị chia cột bé tí nữa.
-2.  **Sửa Tab 4 (Phòng thu):**
-    *   Đã **lấy lại toàn bộ giọng Nữ** (Hoài My, Emma, Xiaoyi) vào danh sách.
-
-Đây là **CODE HOÀN CHỈNH (FULL)**. Chị copy toàn bộ và dán đè vào `app.py` nhé.
-
-```python
 import streamlit as st
 import google.generativeai as genai
 import pandas as pd
