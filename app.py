@@ -484,7 +484,7 @@ def show_main_app():
         }
 
         # 2. CHỌN CHẾ ĐỘ CHƠI
-        mode = st.radio("Chọn chế độ:", ["👤 Đấu Solo (Chị vs AI)", "⚔️ Đại Chiến (AI vs AI)"], horizontal=True)
+        mode = st.radio("Chọn chế độ:", ["👤 Đấu Solo (User vs AI)", "⚔️ Đại Chiến (AI vs AI)"], horizontal=True)
         st.divider()
 
         # --- CHẾ ĐỘ 1: SOLO (GIỮ NGUYÊN CŨ) ---
