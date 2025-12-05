@@ -647,6 +647,7 @@ def main():
                     st.session_state.user_logged_in = True
                     st.session_state.current_user = p
                     st.session_state.current_user_name = st.session_state.key_name_mapping.get(p, "User")
+                    st.session_state.is_admin = pm.is_admin(p) # <--- DÒNG MỚI ĐÃ THÊM
                     st.rerun()
                 else: st.error(T("wrong_pass"))
     else:
