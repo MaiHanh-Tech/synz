@@ -447,49 +447,139 @@ def show_main_app():
                     agraph(nodes, edges, config)
             except: pass
 
-    # TAB 2: DỊCH
+   # === TAB 2: HỌC VIỆN NGÔN NGỮ AI (4 KỸ NĂNG) ===
     with tab2:
-        st.header(T("t2_header"))
+        st.header("🎓 Học Viện Ngôn Ngữ AI (4 Kỹ Năng)")
         
-        # 1. Input tràn màn hình
-        txt = st.text_area(T("t2_input"), height=150, placeholder="Dán văn bản vào đây (Anh/Việt/Trung)...")
+        # Menu chọn kỹ năng
+        skill_mode = st.radio("Chọn kỹ năng muốn luyện:", 
+                             ["📖 Reading (Đọc & Từ vựng)", 
+                              "✍️ Writing (Sửa bài & Chấm điểm)", 
+                              "👂 Listening (Luyện nghe chép chính tả)", 
+                              "🗣️ Speaking (Phiên âm & Shadowing)"], 
+                             horizontal=True)
         
-        # 2. Các nút chọn nằm trên 1 hàng
-        c_lang, c_style, c_btn = st.columns([1, 1, 1])
-        with c_lang:
-            target_lang = st.selectbox(T("t2_target"), ["Tiếng Việt", "English", "中文 (Chinese)", "French", "Japanese"])
-        with c_style:
-            style = st.selectbox(T("t2_style"), T("t2_styles"))
-        with c_btn: 
-            st.write(""); st.write("")
-            btn_trans = st.button(T("t2_btn"), type="primary", use_container_width=True)
+        st.divider()
 
-        # 3. Xử lý & Hiển thị kết quả (Tràn màn hình)
-        if btn_trans and txt:
-            with st.spinner("AI đang xử lý..."):
-                prompt = f"""
-                Bạn là Chuyên gia Ngôn ngữ.
-                Nhiệm vụ: Dịch và phân tích văn bản sau.
-                
-                YÊU CẦU:
-                1. Ngôn ngữ đích: {target_lang}.
-                2. Phong cách: {style}.
-                3. QUAN TRỌNG: Nếu dịch sang TIẾNG TRUNG, bắt buộc cung cấp: Chữ Hán, Pinyin (có dấu).
-                4. Phân tích 3 từ vựng/cấu trúc hay nhất.
-                
-                Văn bản gốc: "{txt}"
-                """
-                res = run_gemini_safe(model.generate_content, prompt)
-                
-                if res:
-                    st.markdown("---")
-                    st.markdown(res.text)
+        # --- KỸ NĂNG 1: READING (ĐỌC HIỂU & TỪ VỰNG) ---
+        if "Reading" in skill_mode:
+            c1, c2 = st.columns([1, 1])
+            with c1:
+                txt_read = st.text_area("Dán văn bản tiếng nước ngoài vào đây:", height=300, placeholder="Dán bài báo, đoạn văn tiếng Anh/Trung/Hàn...")
+            with c2:
+                st.info("AI sẽ: Dịch nghĩa + Trích xuất từ vựng khó + Giải thích ngữ pháp.")
+                if st.button("🔍 Phân Tích Bài Đọc", type="primary", use_container_width=True) and txt_read:
+                    with st.spinner("Giáo sư AI đang soi bài..."):
+                        prompt = f"""
+                        Bạn là Giáo viên Ngôn ngữ. Hãy phân tích đoạn văn sau:
+                        "{txt_read}"
+                        
+                        YÊU CẦU ĐẦU RA (Markdown):
+                        1. **Bản dịch tiếng Việt** mượt mà.
+                        2. **Từ vựng cốt lõi (Key Vocabulary):** Liệt kê 5 từ khó, kèm phiên âm, nghĩa và ví dụ.
+                        3. **Cấu trúc ngữ pháp hay:** Giải thích 1-2 cấu trúc câu phức tạp trong bài.
+                        4. **3 Câu hỏi kiểm tra đọc hiểu** (Kèm đáp án ở cuối).
+                        """
+                        res = run_gemini_safe(model.generate_content, prompt)
+                        if res: st.markdown(res.text)
+
+        # --- KỸ NĂNG 2: WRITING (VIẾT & SỬA LỖI) ---
+        elif "Writing" in skill_mode:
+            c1, c2 = st.columns([1, 1])
+            with c1:
+                txt_write = st.text_area("Viết bài của bạn vào đây (Essay/Email...):", height=300)
+                style_write = st.selectbox("Mục tiêu viết:", ["IELTS Academic", "Business Email", "Văn phong tự nhiên", "TOEFL"])
+            with c2:
+                st.info("AI sẽ: Sửa lỗi ngữ pháp + Nâng cấp từ vựng + Chấm điểm.")
+                if st.button("✍️ Chấm & Sửa Bài", type="primary", use_container_width=True) and txt_write:
+                    with st.spinner("Giám khảo đang chấm bài..."):
+                        prompt = f"""
+                        Đóng vai giám khảo {style_write}. Hãy chấm bài viết sau:
+                        "{txt_write}"
+                        
+                        YÊU CẦU:
+                        1. **Sửa lỗi sai (Correction):** Chỉ ra lỗi ngữ pháp/chính tả cụ thể.
+                        2. **Phiên bản nâng cấp (Better Version):** Viết lại đoạn văn trên hay hơn, dùng từ vựng xịn hơn (C1/C2).
+                        3. **Đánh giá:** Ước lượng Band điểm (nếu là IELTS) hoặc độ chuyên nghiệp.
+                        """
+                        res = run_gemini_safe(model.generate_content, prompt)
+                        if res: st.markdown(res.text)
+
+        # --- KỸ NĂNG 3: LISTENING (LUYỆN NGHE) ---
+        elif "Listening" in skill_mode:
+            st.subheader("📻 Phòng Luyện Nghe (Dictation)")
+            
+            # Bước 1: Chọn chủ đề để AI tạo nội dung
+            topic_listen = st.text_input("Nhập chủ đề muốn nghe:", value="Daily Conversation about Coffee")
+            voice_listen = st.selectbox("Giọng đọc:", ["🇺🇸 Anh-Mỹ (Nam)", "🇺🇸 Anh-Mỹ (Nữ)", "🇬🇧 Anh-Anh (Nữ)"])
+            
+            # Map giọng
+            voice_map = {
+                "🇺🇸 Anh-Mỹ (Nam)": "en-US-AndrewMultilingualNeural",
+                "🇺🇸 Anh-Mỹ (Nữ)": "en-US-EmmaNeural",
+                "🇬🇧 Anh-Anh (Nữ)": "en-GB-SoniaNeural"
+            }
+            
+            if st.button("🎧 Tạo Bài Nghe Mới"):
+                with st.spinner("AI đang viết kịch bản & Thu âm..."):
+                    # 1. AI viết đoạn văn ngắn
+                    prompt_script = f"Write a short paragraph (approx 50 words) about: {topic_listen}. Level: Intermediate. Just the English text."
+                    res_script = run_gemini_safe(model.generate_content, prompt_script)
                     
-                    # Nút tải HTML
-                    html_content = f"<html><body><h2>Translation</h2><p><b>Original:</b> {txt}</p><hr>{markdown.markdown(res.text)}</body></html>"
-                    st.download_button("💾 Download HTML", html_content, "translation.html", "text/html")
+                    if res_script:
+                        text_script = res_script.text
+                        st.session_state.listen_text = text_script # Lưu vào bộ nhớ
+                        
+                        # 2. Tạo Audio
+                        generate_edge_audio_sync(text_script, voice_map[voice_listen], "+0%", "listening_test.mp3")
+                        st.session_state.listen_ready = True
+            
+            # Bước 2: Hiện Audio (nhưng giấu Text)
+            if st.session_state.get("listen_ready"):
+                st.audio("listening_test.mp3")
+                st.write("👉 **Nhiệm vụ:** Nghe và chép lại nội dung vào bên dưới, sau đó bấm 'Hiện đáp án' để so sánh.")
+                
+                user_dictation = st.text_area("Chép chính tả tại đây:", height=100)
+                
+                with st.expander("👁️ HIỆN ĐÁP ÁN & DỊCH NGHĨA"):
+                    st.success(st.session_state.get("listen_text", ""))
+                    if st.button("Dịch đoạn này sang tiếng Việt"):
+                        p_trans = f"Translate to Vietnamese: {st.session_state.listen_text}"
+                        res_trans = run_gemini_safe(model.generate_content, p_trans)
+                        if res_trans: st.write(res_trans.text)
+
+        # --- KỸ NĂNG 4: SPEAKING (LUYỆN NÓI & PHÁT ÂM) ---
+        elif "Speaking" in skill_mode:
+            c1, c2 = st.columns([1, 1])
+            with c1:
+                txt_speak = st.text_area("Nhập câu bạn muốn luyện nói:", height=150, value="I want to improve my English speaking skills.")
+                accent_speak = st.selectbox("Chọn giọng mẫu:", ["🇺🇸 Mỹ", "🇬🇧 Anh", "🇨🇳 Trung", "🇯🇵 Nhật", "🇰🇷 Hàn"])
+            
+            with c2:
+                st.info("AI sẽ: Tạo phiên âm IPA + Audio mẫu + Hướng dẫn nối âm/ngắt nghỉ.")
+                if st.button("🗣️ Phân Tích & Tạo Audio Mẫu", type="primary") and txt_speak:
+                    # 1. Tạo Audio
+                    v_code = "en-US-AndrewMultilingualNeural" # Mặc định Mỹ
+                    if "Anh" in accent_speak: v_code = "en-GB-RyanNeural"
+                    elif "Trung" in accent_speak: v_code = "zh-CN-YunjianNeural"
+                    elif "Nhật" in accent_speak: v_code = "ja-JP-KeitaNeural"
+                    elif "Hàn" in accent_speak: v_code = "ko-KR-InJoonNeural"
                     
-                    luu_lich_su_vinh_vien("Dịch Thuật", f"{target_lang}: {txt[:20]}...", res.text)
+                    generate_edge_audio_sync(txt_speak, v_code, "+0%", "speaking_sample.mp3")
+                    st.audio("speaking_sample.mp3")
+                    
+                    # 2. Phân tích IPA
+                    with st.spinner("Đang phân tích ngữ âm..."):
+                        prompt_ipa = f"""
+                        Analyze this sentence for a learner: "{txt_speak}"
+                        
+                        OUTPUT:
+                        1. **IPA Transcription:** (Phiên âm quốc tế)
+                        2. **Intonation & Linking:** Chỉ ra chỗ nào cần nối âm (liaison), chỗ nào cần lên/xuống giọng.
+                        3. **Tips:** Mẹo để nói câu này tự nhiên hơn.
+                        """
+                        res_ipa = run_gemini_safe(model.generate_content, prompt_ipa)
+                        if res_ipa: st.markdown(res_ipa.text)
 
   # === TAB 3: ĐẤU TRƯỜNG TƯ DUY (MULTI-AGENT ARENA) ===
     with tab3:
