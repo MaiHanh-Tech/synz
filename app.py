@@ -28,8 +28,13 @@ from groq import Groq # <--- Groq đã được import
 def run_groq_api(prompt, model="mixtral-8x7b-32768"):
     """Gọi Groq API cho các tác vụ cần tốc độ (Chat/Tranh biện)"""
     try:
-        groq_api_key = st.secrets["system"]["groq_api_key"]
-        if not groq_api_key: return "Error: Groq API Key not found."
+        # LOGIC MỚI: Thử tìm Key ở [system] và sau đó thử ở [api_keys] (Nếu có)
+        groq_api_key = st.secrets.get("system", {}).get("groq_api_key")
+        if not groq_api_key:
+            groq_api_key = st.secrets.get("api_keys", {}).get("groq_api_key")
+            
+        if not groq_api_key: 
+            return "Error: Groq API Key not found (Check secrets.toml)."
 
         client = Groq(api_key=groq_api_key)
         
@@ -40,7 +45,7 @@ def run_groq_api(prompt, model="mixtral-8x7b-32768"):
                 {"role": "system", "content": "You are a concise and witty debater."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.8, # Thích hợp cho Tranh biện (sáng tạo hơn)
+            temperature=0.8,
             max_tokens=2048
         )
         return completion.choices[0].message.content
