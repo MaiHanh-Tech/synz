@@ -24,34 +24,38 @@ from google.api_core.exceptions import ResourceExhausted, ServiceUnavailable
 from streamlit_mic_recorder import mic_recorder
 from groq import Groq # <--- Groq đã được import
 
-# --- HÀM GỌI GROQ (KHÔNG SỬA) ---
+# --- HÀM GỌI GROQ (BỊ LỖI -> TRẢ VỀ GEMINI BẢN GỐC) ---
+# Em sẽ thay thế toàn bộ logic Groq bằng logic gọi Gemini gốc để không bị lỗi 401
 def run_groq_api(prompt, model="mixtral-8x7b-32768"):
-    """Gọi Groq API cho các tác vụ cần tốc độ (Chat/Tranh biện)"""
+    """
+    HÀM DỰ PHÒNG: KHÔNG DÙNG GROQ NỮA MÀ DÙNG GEMINI
+    vì Groq Key bị lỗi 401, không thể sửa được từ code.
+    """
     try:
-        # LOGIC MỚI: Thử tìm Key ở [system] và sau đó thử ở [api_keys] (Nếu có)
-        groq_api_key = st.secrets.get("system", {}).get("groq_api_key")
-        if not groq_api_key:
-            groq_api_key = st.secrets.get("api_keys", {}).get("groq_api_key")
-            
-        if not groq_api_key: 
-            return "Error: Groq API Key not found (Check secrets.toml)."
+        # 1. Cấu hình Gemini (Sẽ dùng Key chung của App)
+        sys_api_key = st.secrets["system"]["gemini_api_key"]
+        genai.configure(api_key=sys_api_key)
+        
+        # 2. Chọn Model (Dùng chung của App)
+        try: 
+            model_gemini = genai.GenerativeModel("gemini-2.5-pro")
+        except: 
+            model_gemini = genai.GenerativeModel("gemini-2.5-flash")
+        
+        # 3. Gọi Gemini với hàm an toàn cũ của App
+        for i in range(3):
+            try:
+                response = model_gemini.generate_content(prompt)
+                return response.text
+            except ResourceExhausted:
+                time.sleep(2)
+            except Exception as e:
+                time.sleep(1)
+        return "[Groq/Gemini Error: Quá tải hệ thống]"
 
-        client = Groq(api_key=groq_api_key)
-        
-        # Gọi API
-        completion = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "You are a concise and witty debater."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.8,
-            max_tokens=2048
-        )
-        return completion.choices[0].message.content
-        
     except Exception as e:
-        return f"[Groq Error: {str(e)}]"
+        return f"[Groq Error: Key không được cấu hình đúng. Dùng Gemini."
+
         
 # Fix lỗi asyncio trên Windows (Giữ nguyên)
 if sys.platform == 'win32':
@@ -529,7 +533,7 @@ def show_main_app():
                     
                     luu_lich_su_vinh_vien("Dịch Thuật", f"{target_lang}: {txt[:20]}...", res.text)
 
-  # === TAB 3: ĐẤU TRƯỜNG TƯ DUY (SỬ DỤNG GROQ API) ===
+  # === TAB 3: ĐẤU TRƯỜNG TƯ DUY (TRẢ VỀ GEMINI BẢN GỐC) ===
     with tab3:
         st.header(T("t3_header"))
         
@@ -571,7 +575,7 @@ def show_main_app():
                     st.chat_message("user").markdown(q)
                     st.session_state.chat_history.append({"role":"user", "content":q})
                     
-                    # Logic gọi AI (Dùng Groq cho tốc độ)
+                    # Logic gọi AI (ĐÃ HOÀN NGUYÊN VỀ GEMINI)
                     history_text = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.chat_history[-5:]])
                     prompt = f"""
                     VAI TRÒ CỦA BẠN: {personas[p_sel]}
@@ -580,20 +584,13 @@ def show_main_app():
                     YÊU CẦU: Phân tích sâu, phản biện sắc sảo, và trả lời bằng ngôn ngữ của người dùng.
                     """
                     
-                    # GỌI GROQ API TẠI ĐÂY
-                    with st.spinner("Groq đang phản biện siêu tốc..."):
-                        res_text = run_groq_api(prompt, model="mixtral-8x7b-32768")
+                    # GỌI GEMINI SAFE TẠI ĐÂY
+                    res = run_gemini_safe(model.generate_content, prompt)
                     
-                    if "[Groq Error" in res_text:
-                         st.error(f"Groq gặp lỗi: {res_text}")
-                         res = None
-                    else:
-                         res = res_text
-                        
                     if res:
-                        st.chat_message("assistant").markdown(res)
-                        st.session_state.chat_history.append({"role":"assistant", "content":res})
-                        luu_lich_su_vinh_vien("Tranh Biện Solo", f"Vs {p_sel}: {q}", res)
+                        st.chat_message("assistant").markdown(res.text)
+                        st.session_state.chat_history.append({"role":"assistant", "content":res.text})
+                        luu_lich_su_vinh_vien("Tranh Biện Solo", f"Vs {p_sel}: {q}", res.text)
 
         # --- CHẾ ĐỘ 2: DEBATE (AI vs AI) ---
         else:
@@ -634,16 +631,17 @@ def show_main_app():
                                             break
                                     p_prompt = f"VAI TRÒ: {p_name}. PHẢN BÁC: \"{target_name}\" vừa nói: \"{last_speech}\". Yêu cầu: Phản bác lại lập luận đó theo triết lý của bạn."
                                 
-                                # GỌI GROQ API TẠI ĐÂY (Vòng lặp)
-                                res_text = run_groq_api(p_prompt, model="mixtral-8x7b-32768")
+                                # GỌI GEMINI SAFE TẠI ĐÂY
+                                res = run_gemini_safe(model.generate_content, p_prompt)
                                 
-                                if "[Groq Error" in res_text:
-                                    st.error(f"Groq gặp lỗi: {res_text}. Dừng tranh biện.")
-                                    break # Dừng vòng lặp nếu Groq lỗi
-                                
-                                reply = res_text
-                                st.session_state.battle_logs.append(f"**{p_name}:** {reply}")
-                                time.sleep(2) # Giảm sleep để Groq chạy nhanh hơn
+                                if res:
+                                    reply = res.text
+                                    st.session_state.battle_logs.append(f"**{p_name}:** {reply}")
+                                    time.sleep(4) # Vẫn giữ sleep để Gemini không bị quota
+                                else:
+                                     # Báo lỗi và dừng vòng lặp
+                                    st.error(f"Gemini gặp lỗi: Không phản hồi. Dừng tranh biện.")
+                                    break
 
                         status.update(label="✅ Tranh luận kết thúc! (Đã chạy 3 vòng)", state="complete")
                         
