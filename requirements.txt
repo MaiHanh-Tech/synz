@@ -19,4 +19,9 @@ google-auth
 python-telegram-bot  
 langdetect          
 streamlit-mic-recorder
-
+pydantic-ai
+pypinyin
+jieba
+groq
+supabase
+torch
