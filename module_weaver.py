@@ -206,14 +206,12 @@ def run():
     knowledge_universe = get_knowledge_universe()
 
     with st.sidebar:
-        st.markdown("---")
-        lang_choice = st.selectbox("🌐 " + TRANS['vi']['lang_select'], ["Tiếng Việt", "English", "中文"], key="weaver_lang_selector")
-        if lang_choice == "Tiếng Việt":
-            st.session_state.weaver_lang = 'vi'
-        elif lang_choice == "English":
-            st.session_state.weaver_lang = 'en'
-        else:
-            st.session_state.weaver_lang = 'zh'
+    st.markdown("---")
+    st.selectbox(
+        "🌐 " + T("lang_select"),
+        ["Tiếng Việt", "English", "中文"],
+        key="weaver_lang"  # Key này tự động lưu vào session_state, không cần if-elif
+    )
 
     st.header(f"🧠 The Cognitive Weaver")
     
