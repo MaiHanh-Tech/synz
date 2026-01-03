@@ -491,7 +491,7 @@ def run():
                                         full_transcript.append(content_fmt)
                                         with st.chat_message("assistant", avatar=icon):
                                             st.markdown(content_fmt)
-                                        time.sleep(1)
+                                        time.sleep(3)
                                 except Exception as e:
                                     st.error(f"Lỗi khi gọi AI cho {p_name}: {e}")
                                     continue
