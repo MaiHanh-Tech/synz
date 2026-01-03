@@ -206,14 +206,14 @@ def run():
     knowledge_universe = get_knowledge_universe()
 
     with st.sidebar:
-    st.markdown("---")
-    st.selectbox(
-        "🌐 " + T("lang_select"),
-        ["Tiếng Việt", "English", "中文"],
-        key="weaver_lang"  # Key này tự động lưu vào session_state, không cần if-elif
-    )
+        st.markdown("---")
+        st.selectbox(
+            "🌐 " + T("lang_select"),
+            ["Tiếng Việt", "English", "中文"],
+            key="weaver_lang"  # Key này tự động lưu vào session_state, không cần if-elif
+        )
 
-    st.header(f"🧠 The Cognitive Weaver")
+        st.header(f"🧠 The Cognitive Weaver")
     
     # ✅ HIỂN THỊ TRẠNG THÁI KG (MỚI)
     if knowledge_universe:
