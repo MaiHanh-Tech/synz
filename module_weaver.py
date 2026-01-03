@@ -476,13 +476,16 @@ def run():
                 with st.status("🔥 Cuộc chiến đang diễn ra (3 vòng)...") as status:
                     try:
                         for round_num in range(1, 4):
-                            if time.time() - start_time > MAX_DEBATE_TIME:
-                                st.warning("⏰ Hết giờ! Cuộc tranh luận kết thúc sớm.")
+                            # ✅ THÊM: Kiểm tra timeout tổng
+                            elapsed = time.time() - start_time
+                            if elapsed > MAX_DEBATE_TIME:
+                                st.warning(f"⏰ Hết giờ! (Đã chạy {elapsed:.0f}s)")
                                 break
 
-                            status.update(label=f"🔄 Vòng {round_num}/3 đang diễn ra...")
+                            status.update(label=f"🔄 Vòng {round_num}/3...")
 
                             for i, p_name in enumerate(participants):
+                                # ✅ Kiểm tra timeout từng vòng
                                 if time.time() - start_time > MAX_DEBATE_TIME:
                                     break
 
@@ -491,40 +494,61 @@ def run():
                                     recent_msgs = st.session_state.weaver_chat[-4:]
                                     context_str = "\n".join([f"{m['role']}: {m['content']}" for m in recent_msgs])
 
-                                length_instruction = " (BẮT BUỘC: Trả lời ngắn gọn khoảng 150-200 từ. Đi thẳng vào trọng tâm, không lan man.)"
+                                # ✅ TĂNG CƯỜNG: Bắt buộc ngắn gọn hơn
+                                length_instruction = " (BẮT BUỘC: Trả lời KHÔNG QUÁ 100 từ. Chỉ nêu luận điểm chính, không dài dòng.)"
 
                                 if round_num == 1:
-                                    p_prompt = f"CHỦ ĐỀ: {topic}\nNHIỆM VỤ (Vòng 1 - Mở đầu): Nêu quan điểm chính và 2-3 lý lẽ. {length_instruction}"
+                                    p_prompt = f"CHỦ ĐỀ: {topic}\nNHIỆM VỤ (Vòng 1): Nêu 1 quan điểm chính + 2 lý lẽ. {length_instruction}"
                                 else:
-                                    p_prompt = f"CHỦ ĐỀ: {topic}\nBỐI CẢNH MỚI NHẤT:\n{context_str}\n\nNHIỆM VỤ (Vòng {round_num} - Phản biện): Phản biện sắc bén quan điểm đối thủ và củng cố lập trường của mình. {length_instruction}"
+                                    p_prompt = f"CHỦ ĐỀ: {topic}\nBỐI CẢNH:\n{context_str}\n\nNHIỆM VỤ (Vòng {round_num}): Phản biện ngắn gọn. {length_instruction}"
 
                                 try:
-                                    res = ai.generate(
-                                        p_prompt,
-                                        model_type="pro",
-                                        system_instruction=DEBATE_PERSONAS[p_name]
-                                    )
+                                    # ✅ HIỂN THỊ STATUS ĐANG GỌI AI
+                                    with st.spinner(f"🤖 {p_name} đang suy nghĩ..."):
+                                        res = ai.generate(
+                                            p_prompt,
+                                            model_type="pro",
+                                            system_instruction=DEBATE_PERSONAS[p_name],
+                                            max_tokens=500  # ✅ GIẢM từ 2000 → 500 (ngắn gọn)
+                                        )
 
-                                    if res:
+                                    if res and "⚠️" not in res:
+                                        # Làm sạch response
                                         clean_res = res.replace(f"{p_name}:", "").strip()
                                         clean_res = clean_res.replace(f"**{p_name}:**", "").strip()
-                                        icons = {"Kẻ Phản Biện": "😈", "Shushu": "🎩", "Phật Tổ": "🙏", "Socrates": "🏛️"}
+                                        
+                                        # Icon
+                                        icons = {
+                                            "Kẻ Phản Biện": "😈",
+                                            "🎩 Shushu": "🎩",
+                                            "🙏 Phật Tổ": "🙏",
+                                            "🤔 Logic & Phản Biện": "🤔"
+                                        }
                                         icon = icons.get(p_name, "🤖")
+                                        
                                         content_fmt = f"### {icon} {p_name}\n\n{clean_res}"
                                         st.session_state.weaver_chat.append({"role": "assistant", "content": content_fmt})
                                         full_transcript.append(content_fmt)
+                                        
                                         with st.chat_message("assistant", avatar=icon):
                                             st.markdown(content_fmt)
-                                        time.sleep(5)
+                                        
+                                        # ✅ BỎ time.sleep(5) - KHÔNG CẦN CHỜ
+                                        
+                                    else:
+                                        st.error(f"❌ {p_name} không trả lời được")
+                                        
                                 except Exception as e:
-                                    st.error(f"Lỗi khi gọi AI cho {p_name}: {e}")
+                                    st.error(f"❌ Lỗi gọi AI cho {p_name}: {str(e)[:100]}")
                                     continue
+                                    
                         status.update(label="✅ Tranh luận kết thúc!", state="complete")
+                        
                     except Exception as e:
-                        st.error(f"Lỗi trong quá trình tranh luận: {e}")
+                        st.error(f"❌ Lỗi nghiêm trọng: {e}")
 
                 full_log = "\n\n".join(full_transcript)
-                store_history("Hội Đồng Tranh Biện", f"Chủ đề: {topic}", full_log)
+                store_history("Hội Đồng Tranh Biện", f"Chủ đề: {topic}", full_log[:1000])
 
     # TAB 4: VOICE
     with tab4:
