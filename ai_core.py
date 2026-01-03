@@ -129,30 +129,41 @@ class AI_Core:
     def generate(self, prompt, model_type="pro", system_instruction=None):
         """GROK → GEMINI → DEEPSEEK - Auto fallback"""
         self.status_message.info("🤖 Đang gọi AI...")
-        
+    
+        # ✅ DEBUG: Log trạng thái
+        st.caption(f"🔍 Status: Grok={self.grok_ready}, Gemini={self.gemini_ready}, Deepseek={self.deepseek_ready}")
+    
         # 1️⃣ GROK (Best)
         if self.grok_ready:
+            st.caption("🔄 Thử Grok...")
             result = self._grok_generate(prompt, system_instruction)
             if result:
                 self.status_message.success("🎯 Grok hoàn thành")
                 return result
+            else:
+                st.warning("❌ Grok fail → thử Gemini")
 
         # 2️⃣ GEMINI  
         if self.gemini_ready:
+            st.caption(f"🔄 Thử Gemini ({model_type})...")
             result = self._gemini_generate(prompt, model_type, system_instruction)
             if result:
                 self.status_message.success("🔄 Gemini hoàn thành")
                 return result
+            else:
+                st.warning("❌ Gemini fail → thử DeepSeek")
 
         # 3️⃣ DEEPSEEK FREE
         if self.deepseek_ready:
+            st.caption("🔄 Thử DeepSeek...")
             result = self._deepseek_generate(prompt, system_instruction)
             if result:
                 self.status_message.success("💰 DeepSeek FREE hoàn thành")
                 return result
 
-        self.status_message.error("⚠️ Tất cả API bận. Thử lại sau 2p!")
-        return "⚠️ Hệ thống bận. Thử lại sau 1-2 phút nhé chị!"
+        self.status_message.error("⚠️ Tất cả API bận!")
+        return "⚠️ Hệ thống bận!"
+
 
     @staticmethod
     @st.cache_data(ttl=3600)
