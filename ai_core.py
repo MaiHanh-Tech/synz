@@ -18,18 +18,8 @@ class AI_Core:
         self.grok_client = None
         self.deepseek_client = None
 
-        # 1. GROK (xAI) - Ưu tiên cao nhất
-        try:
-            if "xai" in st.secrets and "api_key" in st.secrets["xai"]:
-                self.grok_client = OpenAI(
-                    api_key=st.secrets["xai"]["api_key"],
-                    base_url="https://api.x.ai/v1"
-                )
-                self.grok_ready = True
-        except Exception:
-            pass
-
-        # 2. DEEPSEEK
+        
+        # 1. DEEPSEEK
         try:
             if "deepseek" in st.secrets and "api_key" in st.secrets["deepseek"]:
                 self.deepseek_client = OpenAI(
@@ -41,7 +31,7 @@ class AI_Core:
             pass
         
         
-        # 3. GEMINI
+        # 2. GEMINI
         try:
             if "api_keys" in st.secrets and "gemini_api_key" in st.secrets["api_keys"]:
                 genai.configure(api_key=st.secrets["api_keys"]["gemini_api_key"])
@@ -63,33 +53,42 @@ class AI_Core:
         except Exception:
             pass
 
-        
+        # 3. GROK (xAI)
+        try:
+            if "xai" in st.secrets and "api_key" in st.secrets["xai"]:
+                self.grok_client = OpenAI(
+                    api_key=st.secrets["xai"]["api_key"],
+                    base_url="https://api.x.ai/v1"
+                )
+                self.grok_ready = True
+        except Exception:
+            pass
+
         # Status tổng quan
         with self.status_container:
             status_parts = []
-            if self.grok_ready: status_parts.append("🟢 Grok")
-            if self.gemini_ready: status_parts.append("🟡 Gemini")
             if self.deepseek_ready: status_parts.append("🟣 DeepSeek")
+            if self.gemini_ready: status_parts.append("🟡 Gemini")
+            if self.grok_ready: status_parts.append("🟢 Grok")
             if not status_parts:
                 st.error("🔴 Không có API nào sẵn sàng")
             else:
                 st.caption(f"**AI Engine:** {' → '.join(status_parts)}")
 
-    def _grok_generate(self, prompt, system_instruction=None):
-        if not self.grok_ready: return None
-        models = ["grok-4", "grok-beta", "grok-2"]  # Model thực tế xAI 2026
+    def _deepseek_generate(self, prompt, system_instruction=None):
+        if not self.deepseek_ready: return None
+        models = ["deepseek-chat", "deepseek-reasoner"]
         messages = [{"role": "user", "content": prompt}]
         if system_instruction:
             messages.insert(0, {"role": "system", "content": system_instruction})
 
         for model in models:
             try:
-                resp = self.grok_client.chat.completions.create(
+                resp = self.deepseek_client.chat.completions.create(
                     model=model,
                     messages=messages,
                     temperature=0.8,
-                    max_tokens=7000,
-                    top_p=0.95
+                    max_tokens=7000
                 )
                 return resp.choices[0].message.content.strip()
             except (RateLimitError, APIError, AuthenticationError):
@@ -123,20 +122,21 @@ class AI_Core:
         except Exception:
             return None
 
-    def _deepseek_generate(self, prompt, system_instruction=None):
-        if not self.deepseek_ready: return None
-        models = ["deepseek-chat", "deepseek-reasoner"]
+    def _grok_generate(self, prompt, system_instruction=None):
+        if not self.grok_ready: return None
+        models = ["grok-4", "grok-beta", "grok-2"]  # Model thực tế xAI 2026
         messages = [{"role": "user", "content": prompt}]
         if system_instruction:
             messages.insert(0, {"role": "system", "content": system_instruction})
 
         for model in models:
             try:
-                resp = self.deepseek_client.chat.completions.create(
+                resp = self.grok_client.chat.completions.create(
                     model=model,
                     messages=messages,
                     temperature=0.8,
-                    max_tokens=7000
+                    max_tokens=7000,
+                    top_p=0.95
                 )
                 return resp.choices[0].message.content.strip()
             except (RateLimitError, APIError, AuthenticationError):
@@ -145,19 +145,13 @@ class AI_Core:
             except Exception:
                 continue
         return None
+    
 
     def generate(self, prompt, model_type="pro", system_instruction=None):
-        """GROK → GEMINI → DEEPSEEK - Auto fallback"""
+        """ DEEPSEEK → GEMINI → GROK - Auto fallback"""
         self.status_message.info("🤖 Đang gọi AI...")
 
-        # 1. GROK
-        if self.grok_ready:
-            result = self._grok_generate(prompt, system_instruction)
-            if result:
-                self.status_message.success("🎯 Grok hoàn thành")
-                return result
-
-        # 2. DEEPSEEK FREE
+        # 1. DEEPSEEK FREE
         if self.deepseek_ready:
             result = self._deepseek_generate(prompt, system_instruction)
             if result:
@@ -165,14 +159,20 @@ class AI_Core:
                 return result
         
         
-        # 3. GEMINI
+        # 2. GEMINI
         if self.gemini_ready:
             result = self._gemini_generate(prompt, model_type, system_instruction)
             if result:
                 self.status_message.success("🔄 Gemini hoàn thành")
                 return result
 
-        
+        # 3. GROK
+        if self.grok_ready:
+            result = self._grok_generate(prompt, system_instruction)
+            if result:
+                self.status_message.success("🎯 Grok hoàn thành")
+                return result
+                
         self.status_message.error("⚠️ Tất cả API bận")
         return "⚠️ Hệ thống bận. Thử lại sau 1-2 phút nhé chị!"
 
