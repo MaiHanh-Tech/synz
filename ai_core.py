@@ -99,7 +99,7 @@ class AI_Core:
                 )
                 return resp.choices[0].message.content.strip()
             except (RateLimitError, APIError):
-                time.sleep(3)
+                time.sleep(4)
                 continue
             except Exception:  # Bắt tất cả lỗi còn lại (bao gồm timeout thực tế)
                 continue
