@@ -25,3 +25,4 @@ jieba
 groq
 supabase
 torch
+openai
