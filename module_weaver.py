@@ -306,7 +306,31 @@ def run():
             try:
                 if "df_viz" not in st.session_state:
                     st.session_state.df_viz = pd.read_excel(file_excel).dropna(subset=["Tên sách"])
-                # ... (code graph Excel cũ giữ nguyên)
+                df_v = st.session_state.df_viz
+                
+                with st.expander(T("t1_graph_title"), expanded=False):
+                    vec = load_models()
+                    if "book_embs" not in st.session_state:
+                        with st.spinner("Đang số hóa sách..."):
+                            st.session_state.book_embs = vec.encode(df_v["Tên sách"].tolist())
+                    
+                    embs = st.session_state.book_embs
+                    sim = cosine_similarity(embs)
+                    nodes, edges = [], []
+                    
+                    # Graph Config
+                    total_books = len(df_v)
+                    c_slider1, c_slider2 = st.columns(2)
+                    with c_slider1: max_nodes = st.slider("Số lượng sách hiển thị:", 5, total_books, min(50, total_books))
+                    with c_slider2: threshold = st.slider("Độ tương đồng nối dây:", 0.0, 1.0, 0.45)
+
+                    for i in range(max_nodes):
+                        nodes.append(Node(id=str(i), label=df_v.iloc[i]["Tên sách"], size=20, color="#FFD166"))
+                        for j in range(i+1, max_nodes):
+                            if sim[i,j]>threshold: edges.append(Edge(source=str(i), target=str(j), color="#118AB2"))
+                    
+                    config = Config(width=900, height=600, directed=False, physics=True, collapsible=False)
+                    agraph(nodes, edges, config)
             except:
                 pass
 
