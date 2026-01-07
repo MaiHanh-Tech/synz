@@ -207,53 +207,43 @@ def run():
     ai = AI_Core()
     voice = Voice_Engine()
 
-    # ✅ THAY ĐỔI: Khởi tạo KG với thông báo rõ ràng về sách tinh hoa
+    # Khởi tạo KG
     knowledge_universe = get_knowledge_universe()
 
-    # ===== SIDEBAR: LANGUAGE SELECTOR =====
+    # ✅ SỬA: Sidebar chỉ có selectbox ngôn ngữ
     with st.sidebar:
         st.markdown("---")
-        
-        # ✅ CRITICAL: Khởi tạo weaver_lang TRƯỚC KHI DÙNG
-        if "weaver_lang" not in st.session_state:
-            st.session_state.weaver_lang = "vi"
-        
-        # Selectbox với index để giữ nguyên lựa chọn
-        lang_options = ["Tiếng Việt", "English", "中文"]
-        lang_codes = ["vi", "en", "zh"]
-        
-        try:
-            current_index = lang_codes.index(st.session_state.weaver_lang)
-        except ValueError:
-            current_index = 0
-        
-        lang_choice = st.selectbox(
-            "🌐 Ngôn ngữ / Language / 语言",
-            lang_options,
-            index=current_index,
-            key="weaver_lang_selector"
+        st.selectbox(
+            "🌐 " + T("lang_select"),
+            ["Tiếng Việt", "English", "中文"],
+            key="weaver_lang"
         )
-        
-        # Map và update
-        lang_map = dict(zip(lang_options, lang_codes))
-        new_lang = lang_map.get(lang_choice, "vi")
-        
-        # Nếu đổi ngôn ngữ → Rerun để UI cập nhật
-        if new_lang != st.session_state.weaver_lang:
-            st.session_state.weaver_lang = new_lang
-            st.rerun()
 
+    # ✅ ĐÚNG: Header nằm ngoài sidebar
     st.header(f"🧠 The Cognitive Weaver")
-    
-    # ✅ HIỂN THỊ TRẠNG THÁI KG (MỚI)
+
+    # ✅ SỬA: Hiển thị trạng thái KG (không dùng eval)
     if knowledge_universe:
         summary = knowledge_universe.get_episteme_summary()
         col1, col2, col3, col4 = st.columns(4)
-        for layer, data in summary.items():
-            with eval(f"col{1+list(summary.keys()).index(layer)}"):
-                st.metric(layer[:15], f"{data['count']} sách", delta=f"{len(data['recent'])} recent")
+        layers = list(summary.keys())
+        for i, (layer, data) in enumerate(summary.items()):
+            if i == 0:
+                with col1:
+                    st.metric(layer[:15], f"{data['count']} sách", delta=f"{len(data['recent'])} recent")
+            elif i == 1:
+                with col2:
+                    st.metric(layer[:15], f"{data['count']} sách", delta=f"{len(data['recent'])} recent")
+            elif i == 2:
+                with col3:
+                    st.metric(layer[:15], f"{data['count']} sách", delta=f"{len(data['recent'])} recent")
+            elif i == 3:
+                with col4:
+                    st.metric(layer[:15], f"{data['count']} sách", delta=f"{len(data['recent'])} recent")
 
+    # Tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([T("tab1"), T("tab2"), T("tab3"), T("tab4"), T("tab5")])
+
 
     # TAB 1: RAG (CẢI TIẾN với KG integration)
     with tab1:
