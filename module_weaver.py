@@ -138,8 +138,13 @@ TRANS = {
 }
 
 def T(key):
-    lang = st.session_state.get('weaver_lang', 'vi')
-    return TRANS.get(lang, TRANS['vi']).get(key, key)
+    """Translation helper with fallback"""
+    try:
+        lang = st.session_state.get('weaver_lang', 'vi')
+        return TRANS.get(lang, TRANS['vi']).get(key, key)
+    except Exception:
+        # Fallback nếu có lỗi bất ngờ
+        return TRANS['vi'].get(key, key)
 
 @st.cache_resource
 def load_models():
@@ -205,26 +210,35 @@ def run():
     # ✅ THAY ĐỔI: Khởi tạo KG với thông báo rõ ràng về sách tinh hoa
     knowledge_universe = get_knowledge_universe()
 
+    # ===== SIDEBAR: LANGUAGE SELECTOR =====
     with st.sidebar:
         st.markdown("---")
-    
-        # ✅ KHỞI TẠO weaver_lang TRƯỚC KHI DÙNG (quan trọng!)
+        
+        # ✅ CRITICAL: Khởi tạo weaver_lang TRƯỚC KHI DÙNG
         if "weaver_lang" not in st.session_state:
             st.session_state.weaver_lang = "vi"
-    
-        # ✅ Selectbox với callback để update ngay
+        
+        # Selectbox với index để giữ nguyên lựa chọn
+        lang_options = ["Tiếng Việt", "English", "中文"]
+        lang_codes = ["vi", "en", "zh"]
+        
+        try:
+            current_index = lang_codes.index(st.session_state.weaver_lang)
+        except ValueError:
+            current_index = 0
+        
         lang_choice = st.selectbox(
-            "🌐 Ngôn ngữ / Language / 语言",  # ✅ Hardcode, không dùng T()
-            ["Tiếng Việt", "English", "中文"],
-            index=["vi", "en", "zh"].index(st.session_state.weaver_lang),
+            "🌐 Ngôn ngữ / Language / 语言",
+            lang_options,
+            index=current_index,
             key="weaver_lang_selector"
         )
-    
-        # ✅ Map và update session_state
-        lang_map = {"Tiếng Việt": "vi", "English": "en", "中文": "zh"}
+        
+        # Map và update
+        lang_map = dict(zip(lang_options, lang_codes))
         new_lang = lang_map.get(lang_choice, "vi")
-    
-        # ✅ Nếu đổi ngôn ngữ → Rerun
+        
+        # Nếu đổi ngôn ngữ → Rerun để UI cập nhật
         if new_lang != st.session_state.weaver_lang:
             st.session_state.weaver_lang = new_lang
             st.rerun()
