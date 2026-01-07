@@ -527,7 +527,7 @@ def run():
                                             p_prompt,
                                             model_type="pro",
                                             system_instruction=DEBATE_PERSONAS[p_name],
-                                            max_tokens=2000  
+                                            max_tokens=5000  
                                         )
 
                                     if res and "⚠️" not in res:
