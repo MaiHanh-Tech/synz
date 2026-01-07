@@ -47,7 +47,7 @@ class AI_Core:
                 ]
                 self.gen_config = genai.GenerationConfig(
                     temperature=0.7,  # ✅ GIẢM từ 0.8 → 0.7 (ít random hơn)
-                    max_output_tokens=5000,  
+                    max_output_tokens=7000,  
                     top_p=0.9,  # ✅ GIẢM từ 0.95 → 0.9
                     top_k=40
                 )
