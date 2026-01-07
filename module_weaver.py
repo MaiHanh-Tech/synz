@@ -207,15 +207,27 @@ def run():
 
     with st.sidebar:
         st.markdown("---")
+    
+        # ✅ KHỞI TẠO weaver_lang TRƯỚC KHI DÙNG (quan trọng!)
+        if "weaver_lang" not in st.session_state:
+            st.session_state.weaver_lang = "vi"
+    
+        # ✅ Selectbox với callback để update ngay
         lang_choice = st.selectbox(
-            "🌐 " + TRANS['vi']['lang_select'],  # ✅ Dùng trực tiếp, không qua T()
+            "🌐 Ngôn ngữ / Language / 语言",  # ✅ Hardcode, không dùng T()
             ["Tiếng Việt", "English", "中文"],
+            index=["vi", "en", "zh"].index(st.session_state.weaver_lang),
             key="weaver_lang_selector"
         )
     
-        # ✅ Map sang mã ngôn ngữ
+        # ✅ Map và update session_state
         lang_map = {"Tiếng Việt": "vi", "English": "en", "中文": "zh"}
-        st.session_state.weaver_lang = lang_map.get(lang_choice, "vi")
+        new_lang = lang_map.get(lang_choice, "vi")
+    
+        # ✅ Nếu đổi ngôn ngữ → Rerun
+        if new_lang != st.session_state.weaver_lang:
+            st.session_state.weaver_lang = new_lang
+            st.rerun()
 
     st.header(f"🧠 The Cognitive Weaver")
     
