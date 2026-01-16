@@ -15,9 +15,9 @@ except Exception as e:
     st.stop()
 
 # SIMPLE SAFE WRAPPER
-def safe_run_module(module_func, module_name, components):
+def safe_run_module(module_func, module_name):
     try:
-        module_func(components)  # Pass components
+        module_func()
     except Exception as e:
         st.error(f"❌ Module {module_name} gặp lỗi:")
         st.exception(e)
@@ -83,26 +83,14 @@ with st.sidebar:
         except Exception:
             st.warning("Không thể tải danh sách user từ DB")
 
-# 5. LOAD UI MODULES AN TOÀN WITH ORCHESTRATOR
-from orchestrator import CognitiveApp  # New import
-
+# 5. LOAD UI MODULES AN TOÀN
 try:
-    app_orch = (CognitiveApp()
-                .with_ai()
-                .with_translator()
-                .with_voice()
-                .with_logger()
-                .with_db()
-                .with_knowledge_graph()
-                .with_personal_rag(st.session_state.current_user)  # Pass user_id
-                .build())
-
     if app_choice == "💰 1. Cognitive Weaver":
         import module_weaver as mw
-        safe_run_module(mw.run, "Cognitive Weaver", app_orch.components)
+        safe_run_module(mw.run, "Cognitive Weaver")
     elif app_choice == "🧠 2. CFO Controller":
         import module_cfo as mc
-        safe_run_module(mc.run, "CFO Controller", app_orch.components)
+        safe_run_module(mc.run, "CFO Controller")
 except ImportError as e:
     st.error(f"⚠️ Lỗi: Không tìm thấy module tương ứng!\nChi tiết: {e}")
     st.info("👉 Hãy đảm bảo đã có các file UI: module_cfo.py, module_translator.py, module_weaver.py")
