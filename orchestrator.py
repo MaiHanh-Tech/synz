@@ -1,6 +1,3 @@
-# orchestrator.py
-# Central class to orchestrate components in MetaBlocks style
-
 class CognitiveApp:
     def __init__(self):
         self.components = {}
