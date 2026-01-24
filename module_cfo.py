@@ -2,6 +2,14 @@ import streamlit as st
 import pandas as pd
 from services.blocks.cfo_data_manager import tao_data_full_kpi, validate_uploaded_data, tinh_chi_so, phat_hien_gian_lan
 from ai_core import AI_Core
+import time
+
+# ✅ THÊM: MAPPING NGÔN NGỮ CHO CFO
+LANG_MAP_CFO = {
+    "Tiếng Việt": "vi",
+    "English": "en",
+    "中文": "zh"
+}
 
 # ✅ THÊM DICTIONARY DỊCH CHO CFO
 TRANS_CFO = {
@@ -92,18 +100,20 @@ TRANS_CFO = {
 }
 
 def T(key):
-    lang = st.session_state.get('cfo_lang', 'vi')
-    return TRANS_CFO.get(lang, TRANS_CFO['vi']).get(key, key)
+    """✅ SỬA: Translation với mapping"""
+    display_lang = st.session_state.get('cfo_lang', 'Tiếng Việt')
+    lang_code = LANG_MAP_CFO.get(display_lang, 'vi')
+    return TRANS_CFO.get(lang_code, TRANS_CFO['vi']).get(key, key)
 
 def run():
     ai = AI_Core()
 
-    # ✅ THÊM CHỌN NGÔN NGỮ CHO CFO (sidebar riêng)
+    # ✅ SỬA: CHỌN NGÔN NGỮ CHO CFO (sidebar riêng)
     with st.sidebar:
         st.markdown("---")
         st.selectbox(
             "🌐 Ngôn ngữ / Language / 语言",
-            ["Tiếng Việt", "English", "中文"],
+            list(LANG_MAP_CFO.keys()),  # ✅ Dùng keys từ mapping
             key="cfo_lang"
         )
 
