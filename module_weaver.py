@@ -19,7 +19,7 @@ from services.blocks.rag_orchestrator import (
     init_knowledge_universe, 
     create_personal_rag, 
     tai_lich_su,
-    get_translation_orchestrator  # ✅ Hàm này có ở dòng 356 trong rag_orchestrator.py
+    get_translation_orchestrator
 )
 
 # KG module cho upgrade
@@ -37,32 +37,19 @@ try:
 except ImportError:
     pass
 
-# ✅ THÊM MAPPING Ở ĐẦU FILE (sau imports)
-
+# ✅ THÊM: MAPPING NGÔN NGỮ
 LANG_MAP = {
     "Tiếng Việt": "vi",
     "English": "en", 
     "中文": "zh"
 }
 
-def T(key):
-    """Translation helper với mapping"""
-    try:
-        # ✅ CHUYỂN ĐỔI từ tên hiển thị sang mã ngôn ngữ
-        display_lang = st.session_state.get('weaver_lang', 'Tiếng Việt')
-        lang_code = LANG_MAP.get(display_lang, 'vi')
-        
-        return TRANS.get(lang_code, TRANS['vi']).get(key, key)
-    except Exception:
-        return TRANS['vi'].get(key, key)
-
-
 # TRANSLATIONS / UI TEXT
 TRANS = {
     "vi": {
         "lang_select": "Ngôn ngữ / Language / 语言",
         "tab1": "📚 Phân Tích Sách",
-        "tab2": "✍️ Dịch Giả",
+        "tab2": "✏️ Dịch Giả",
         "tab3": "🗣️ Tranh Biện",
         "tab4": "🎙️ Phòng Thu AI",
         "tab5": "⏳ Nhật Ký",
@@ -78,7 +65,7 @@ TRANS = {
         "t2_input": "Nhập văn bản cần dịch:",
         "t2_target": "Dịch sang:",
         "t2_style": "Phong cách:",
-        "t2_btn": "✍️ Dịch Ngay",
+        "t2_btn": "✏️ Dịch Ngay",
         "t3_header": "Đấu Trường Tư Duy",
         "t3_persona_label": "Chọn Đối Thủ:",
         "t3_input": "Nhập chủ đề tranh luận...",
@@ -94,7 +81,7 @@ TRANS = {
     "en": {
         "lang_select": "Language",
         "tab1": "📚 Book Analysis",
-        "tab2": "✍️ Translator",
+        "tab2": "✏️ Translator",
         "tab3": "🗣️ Debater",
         "tab4": "🎙️ AI Studio",
         "tab5": "⏳ History",
@@ -110,7 +97,7 @@ TRANS = {
         "t2_input": "Enter text to translate:",
         "t2_target": "Translate to:",
         "t2_style": "Style:",
-        "t2_btn": "✍️ Translate",
+        "t2_btn": "✏️ Translate",
         "t3_header": "Thinking Arena",
         "t3_persona_label": "Choose Opponent:",
         "t3_input": "Enter debate topic...",
@@ -126,7 +113,7 @@ TRANS = {
     "zh": {
         "lang_select": "语言",
         "tab1": "📚 书籍分析",
-        "tab2": "✍️ 翻译专家",
+        "tab2": "✏️ 翻译专家",
         "tab3": "🗣️ 辩论场",
         "tab4": "🎙️ AI 录音室",
         "tab5": "⏳ 历史记录",
@@ -142,7 +129,7 @@ TRANS = {
         "t2_input": "输入文本:",
         "t2_target": "翻译成:",
         "t2_style": "风格:",
-        "t2_btn": "✍️ 翻译",
+        "t2_btn": "✏️ 翻译",
         "t3_header": "思维竞技场",
         "t3_persona_label": "选择对手:",
         "t3_input": "输入辩论主题...",
@@ -158,12 +145,12 @@ TRANS = {
 }
 
 def T(key):
-    """Translation helper with fallback"""
+    """✅ SỬA: Translation helper với mapping"""
     try:
-        lang = st.session_state.get('weaver_lang', 'vi')
-        return TRANS.get(lang, TRANS['vi']).get(key, key)
+        display_lang = st.session_state.get('weaver_lang', 'Tiếng Việt')
+        lang_code = LANG_MAP.get(display_lang, 'vi')
+        return TRANS.get(lang_code, TRANS['vi']).get(key, key)
     except Exception:
-        # Fallback nếu có lỗi bất ngờ
         return TRANS['vi'].get(key, key)
 
 @st.cache_resource
@@ -230,14 +217,14 @@ def run():
     # Khởi tạo KG
     knowledge_universe = get_knowledge_universe()
 
+    # ✅ SỬA: Sidebar chỉ có selectbox ngôn ngữ
     with st.sidebar:
         st.markdown("---")
         st.selectbox(
             "🌐 " + T("lang_select"),
-            list(LANG_MAP.keys()),  
+            list(LANG_MAP.keys()),  # ✅ Dùng keys từ mapping
             key="weaver_lang"
         )
-    
 
     # ✅ ĐÚNG: Header nằm ngoài sidebar
     st.header(f"🧠 The Cognitive Weaver")
@@ -302,7 +289,7 @@ def run():
                     except Exception as e:
                         st.warning(f"Không thể tính similarity: {e}")
 
-                # ✅ TÌM SÁCH LIÊN QUAN TỪ KG (ưu tiên)
+                # ✅ TÌM SÁCH LIÊN QUAN TỪ KG (Ưu tiên)
                 related = []
                 if knowledge_universe:
                     try:
@@ -671,7 +658,7 @@ def run():
                 if "Tranh Biện" in tp:
                     icon = "🗣️"
                 elif "Dịch" in tp:
-                    icon = "✍️"
+                    icon = "✏️"
 
                 with st.expander(f"{icon} {t} | {tp} | {ti}"):
                     st.markdown(ct)
