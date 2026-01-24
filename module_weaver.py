@@ -483,6 +483,7 @@ def run():
                             st.write(res)
                             st.session_state.weaver_chat.append({"role": "assistant", "content": res})
                             store_history("Tranh Biện Solo", f"{persona} - {prompt[:50]}...", f"Q: {prompt}\nA: {res}")
+                            
         # ✅ THAY THẾ PHẦN MULTI-AGENT TRONG TAB 3 (từ dòng ~600)
 
         else:  # Multi-Agent mode
@@ -493,7 +494,7 @@ def run():
                 max_selections=3
             )
             topic = st.text_input("Chủ đề:", key="w_t3_topic")
-    
+            
             if st.button("🔥 KHAI CHIẾN", disabled=(len(participants) < 2 or not topic)):
                 st.session_state.weaver_chat = []
                 start_msg = f"📢 **CHỦ TỌA:** Khai mạc tranh luận về: *'{topic}'*"
@@ -506,8 +507,7 @@ def run():
 
                 with st.status("🔥 Cuộc chiến đang diễn ra (2 vòng)...") as status:
                     try:
-                        for round_num in range(1, 3):  # 2 vòng
-                            # ✅ Kiểm tra timeout
+                        for round_num in range(1, 3):
                             elapsed = time.time() - start_time
                             if elapsed > MAX_DEBATE_TIME:
                                 st.warning(f"⏰ Hết giờ! (Đã chạy {elapsed:.0f}s)")
@@ -516,61 +516,53 @@ def run():
                             status.update(label=f"🔄 Vòng {round_num}/2...")
 
                             for i, p_name in enumerate(participants):
-                                # ✅ Kiểm tra timeout từng người
                                 if time.time() - start_time > MAX_DEBATE_TIME:
                                     break
 
-                                # ✅ SỬA: Rút gọn context (chỉ lấy 2 msg gần nhất)
                                 context_str = topic
                                 if len(st.session_state.weaver_chat) > 1:
-                                    recent_msgs = st.session_state.weaver_chat[-2:]  # ✅ Giảm từ -4 xuống -2
+                                    recent_msgs = st.session_state.weaver_chat[-2:]
                                     context_str = "\n".join([
-                                        f"{m['role']}: {m['content'][:200]}..."  # ✅ Truncate mỗi msg
+                                        f"{m['role']}: {m['content'][:200]}..."
                                         for m in recent_msgs
                                     ])
 
-                                # ✅ SỬA: Prompt ngắn gọn hơn
                                 if round_num == 1:
                                     p_prompt = f"""CHỦ ĐỀ: {topic}
 
-        NHIỆM VỤ: Nêu 1 quan điểm chính + 1-2 lý lẽ ngắn gọn.
-        YÊU CẦU: 
-        - Tối đa 400 từ
-        - Không dùng ký tự ⚠️ hay emoji cảnh báo
-        - Đi thẳng vào vấn đề"""
+NHIỆM VỤ: Nêu 1 quan điểm chính + 1-2 lý lẽ ngắn gọn.
+YÊU CẦU: 
+- Tối đa 400 từ
+- Không dùng ký tự cảnh báo
+- Đi thẳng vào vấn đề"""
                                 else:
                                     p_prompt = f"""CHỦ ĐỀ: {topic}
 
-        BỐI CẢNH GẦN NHẤT:
-        {context_str}
+BỐI CẢNH GẦN NHẤT:
+{context_str}
 
-        NHIỆM VỤ: Phản biện hoặc bổ sung quan điểm.
-        YÊU CẦU:
-        - Tối đa 400 từ
-        - Không dùng ký tự ⚠️ hay emoji cảnh báo
-        - Tập trung vào luận điểm chính"""
+NHIỆM VỤ: Phản biện hoặc bổ sung quan điểm.
+YÊU CẦU:
+- Tối đa 400 từ
+- Không dùng ký tự cảnh báo
+- Tập trung vào luận điểm chính"""
 
                                 try:
-                                    # ✅ HIỂN THỊ STATUS
                                     with st.spinner(f"🤖 {p_name} đang suy nghĩ..."):
                                         res = ai.generate(
                                             p_prompt,
                                             model_type="pro",
                                             system_instruction=DEBATE_PERSONAS[p_name],
-                                            max_tokens=3000  # ✅ Giảm từ 5000 xuống 3000
+                                            max_tokens=3000
                                         )
 
-                                    # ✅ SỬA: Kiểm tra response linh hoạt hơn
-                                    if res and len(res.strip()) > 10:  # ✅ Chỉ kiểm tra độ dài
-                                        # Làm sạch response
+                                    if res and len(res.strip()) > 10:
                                         clean_res = res.replace(f"{p_name}:", "").strip()
                                         clean_res = clean_res.replace(f"**{p_name}:**", "").strip()
-                                
-                                        # ✅ THÊM: Loại bỏ warning nếu có
+                                        
                                         if "⚠️" in clean_res:
                                             clean_res = clean_res.replace("⚠️", "").strip()
-                                
-                                        # Icon
+                                        
                                         icons = {
                                             "Kẻ Phản Biện": "😈",
                                             "🎩 Shushu": "🎩",
@@ -579,38 +571,36 @@ def run():
                                             "📈 Thực Tế & Đột Phá": "📈"
                                         }
                                         icon = icons.get(p_name, "🤖")
-                                
+                                        
                                         content_fmt = f"### {icon} {p_name}\n\n{clean_res}"
                                         st.session_state.weaver_chat.append({"role": "assistant", "content": content_fmt})
                                         full_transcript.append(content_fmt)
-                                
+                                        
                                         with st.chat_message("assistant", avatar=icon):
                                             st.markdown(content_fmt)
-                                
-                                        time.sleep(2)  # ✅ Giảm từ 4s xuống 2s
-                                
+                                        
+                                        time.sleep(2)
+                                        
                                     else:
-                                        # ✅ THÊM: Hiển thị response thực tế để debug
-                                            st.error(f"❌ {p_name} trả lời không hợp lệ")
+                                        st.error(f"❌ {p_name} trả lời không hợp lệ")
                                         with st.expander(f"🔍 Debug: Response từ {p_name}"):
                                             st.code(f"Response: {res}")
                                             st.code(f"Độ dài: {len(res) if res else 0}")
-                                
+                                    
                                 except Exception as e:
                                     st.error(f"❌ Lỗi gọi AI cho {p_name}")
                                     with st.expander(f"🔍 Chi tiết lỗi {p_name}"):
                                         st.exception(e)
                                         st.code(f"Prompt gửi:\n{p_prompt}")
                                     continue
-                            
+                                    
                         status.update(label="✅ Tranh luận kết thúc!", state="complete")
-                
+                        
                     except Exception as e:
                         st.error(f"❌ Lỗi nghiêm trọng: {e}")
                         with st.expander("🔍 Stack trace đầy đủ"):
                             st.exception(e)
 
-                # ✅ Lưu lịch sử
                 full_log = "\n\n".join(full_transcript)
                 store_history("Hội Đồng Tranh Biện", f"Chủ đề: {topic}", full_log[:1000])
 
