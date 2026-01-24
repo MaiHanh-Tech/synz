@@ -37,6 +37,26 @@ try:
 except ImportError:
     pass
 
+# ✅ THÊM MAPPING Ở ĐẦU FILE (sau imports)
+
+LANG_MAP = {
+    "Tiếng Việt": "vi",
+    "English": "en", 
+    "中文": "zh"
+}
+
+def T(key):
+    """Translation helper với mapping"""
+    try:
+        # ✅ CHUYỂN ĐỔI từ tên hiển thị sang mã ngôn ngữ
+        display_lang = st.session_state.get('weaver_lang', 'Tiếng Việt')
+        lang_code = LANG_MAP.get(display_lang, 'vi')
+        
+        return TRANS.get(lang_code, TRANS['vi']).get(key, key)
+    except Exception:
+        return TRANS['vi'].get(key, key)
+
+
 # TRANSLATIONS / UI TEXT
 TRANS = {
     "vi": {
@@ -210,14 +230,14 @@ def run():
     # Khởi tạo KG
     knowledge_universe = get_knowledge_universe()
 
-    # ✅ SỬA: Sidebar chỉ có selectbox ngôn ngữ
     with st.sidebar:
         st.markdown("---")
         st.selectbox(
             "🌐 " + T("lang_select"),
-            ["Tiếng Việt", "English", "中文"],
+            list(LANG_MAP.keys()),  
             key="weaver_lang"
         )
+    
 
     # ✅ ĐÚNG: Header nằm ngoài sidebar
     st.header(f"🧠 The Cognitive Weaver")
