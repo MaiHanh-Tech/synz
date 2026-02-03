@@ -484,7 +484,7 @@ def run():
                             st.session_state.weaver_chat.append({"role": "assistant", "content": res})
                             store_history("Tranh Biện Solo", f"{persona} - {prompt[:50]}...", f"Q: {prompt}\nA: {res}")
                             
-        # ✅ THAY THẾ PHẦN MULTI-AGENT TRONG TAB 3 (từ dòng ~600)
+        # ✅ THAY THẾ PHẦN MULTI-AGENT TRONG TAB 3 
 
         else:  # Multi-Agent mode
             participants = st.multiselect(
@@ -502,7 +502,7 @@ def run():
                 st.info(start_msg)
                 full_transcript = [start_msg]
 
-                MAX_DEBATE_TIME = 600
+                MAX_DEBATE_TIME = 120  # ✅ GIẢM xuống 120s (đủ cho 2 vòng parallel)
                 start_time = time.time()
 
                 with st.status("🔥 Cuộc chiến đang diễn ra (2 vòng)...") as status:
@@ -515,10 +515,11 @@ def run():
 
                             status.update(label=f"🔄 Vòng {round_num}/2...")
 
-                            for i, p_name in enumerate(participants):
-                                if time.time() - start_time > MAX_DEBATE_TIME:
-                                    break
-
+                            # ✅ TẠO PROMPTS cho TẤT CẢ personas CÙNG LÚC
+                            prompts_dict = {}
+                            sys_insts_dict = {}
+                            
+                            for p_name in participants:
                                 context_str = topic
                                 if len(st.session_state.weaver_chat) > 1:
                                     recent_msgs = st.session_state.weaver_chat[-2:]
@@ -532,7 +533,7 @@ def run():
 
 NHIỆM VỤ: Nêu 1 quan điểm chính + 1-2 lý lẽ ngắn gọn.
 YÊU CẦU: 
-- Tối đa 400 từ
+- Tối đa 300 từ (rút ngắn để nhanh hơn)
 - Không dùng ký tự cảnh báo
 - Đi thẳng vào vấn đề"""
                                 else:
@@ -543,56 +544,51 @@ BỐI CẢNH GẦN NHẤT:
 
 NHIỆM VỤ: Phản biện hoặc bổ sung quan điểm.
 YÊU CẦU:
-- Tối đa 400 từ
+- Tối đa 300 từ
 - Không dùng ký tự cảnh báo
 - Tập trung vào luận điểm chính"""
 
-                                try:
-                                    with st.spinner(f"🤖 {p_name} đang suy nghĩ..."):
-                                        res = ai.generate(
-                                            p_prompt,
-                                            model_type="pro",
-                                            system_instruction=DEBATE_PERSONAS[p_name],
-                                            max_tokens=3000
-                                        )
+                                prompts_dict[p_name] = p_prompt
+                                sys_insts_dict[p_name] = DEBATE_PERSONAS[p_name]
 
-                                    if res and len(res.strip()) > 10:
-                                        clean_res = res.replace(f"{p_name}:", "").strip()
-                                        clean_res = clean_res.replace(f"**{p_name}:**", "").strip()
-                                        
-                                        if "⚠️" in clean_res:
-                                            clean_res = clean_res.replace("⚠️", "").strip()
-                                        
-                                        icons = {
-                                            "Kẻ Phản Biện": "😈",
-                                            "🎩 Shushu": "🎩",
-                                            "🙏 Phật Tổ": "🙏",
-                                            "🤔 Logic & Phản Biện": "🤔",
-                                            "📈 Thực Tế & Đột Phá": "📈"
-                                        }
-                                        icon = icons.get(p_name, "🤖")
-                                        
-                                        content_fmt = f"### {icon} {p_name}\n\n{clean_res}"
-                                        st.session_state.weaver_chat.append({"role": "assistant", "content": content_fmt})
-                                        full_transcript.append(content_fmt)
-                                        
-                                        with st.chat_message("assistant", avatar=icon):
-                                            st.markdown(content_fmt)
-                                        
-                                        time.sleep(2)
-                                        
-                                    else:
-                                        st.error(f"❌ {p_name} trả lời không hợp lệ")
-                                        with st.expander(f"🔍 Debug: Response từ {p_name}"):
-                                            st.code(f"Response: {res}")
-                                            st.code(f"Độ dài: {len(res) if res else 0}")
+                            # ✅ GỌI BATCH (TẤT CẢ PERSONAS SONG SONG)
+                            with st.spinner(f"🤖 Tất cả đang suy nghĩ song song..."):
+                                batch_results = ai.generate_batch(
+                                    prompts_dict, 
+                                    sys_insts_dict, 
+                                    max_tokens=2000  # Rút ngắn để nhanh hơn
+                                )
+
+                            # ✅ HIỂN THỊ KẾT QUẢ theo thứ tự personas
+                            icons = {
+                                "Kẻ Phản Biện": "😈",
+                                "🎩 Shushu": "🎩",
+                                "🙏 Phật Tổ": "🙏",
+                                "🤔 Logic & Phản Biện": "🤔",
+                                "📈 Thực Tế & Đột Phá": "📈"
+                            }
+                            
+                            for p_name in participants:
+                                if p_name in batch_results:
+                                    result = batch_results[p_name]
+                                    clean_res = result['content'].replace(f"{p_name}:", "").strip()
+                                    clean_res = clean_res.replace(f"**{p_name}:**", "").strip()
+                                    if "⚠️" in clean_res:
+                                        clean_res = clean_res.replace("⚠️", "").strip()
                                     
-                                except Exception as e:
-                                    st.error(f"❌ Lỗi gọi AI cho {p_name}")
-                                    with st.expander(f"🔍 Chi tiết lỗi {p_name}"):
-                                        st.exception(e)
-                                        st.code(f"Prompt gửi:\n{p_prompt}")
-                                    continue
+                                    icon = icons.get(p_name, "🤖")
+                                    source_tag = f"[{result['source']}]" if 'source' in result else ""
+                                    
+                                    content_fmt = f"### {icon} {p_name} {source_tag}\n\n{clean_res}"
+                                    st.session_state.weaver_chat.append({"role": "assistant", "content": content_fmt})
+                                    full_transcript.append(content_fmt)
+                                    
+                                    with st.chat_message("assistant", avatar=icon):
+                                        st.markdown(content_fmt)
+                                else:
+                                    st.warning(f"⚠️ {p_name} không phản hồi kịp thời")
+                            
+                            time.sleep(1)  # Ngắt giữa các vòng
                                     
                         status.update(label="✅ Tranh luận kết thúc!", state="complete")
                         
@@ -603,6 +599,7 @@ YÊU CẦU:
 
                 full_log = "\n\n".join(full_transcript)
                 store_history("Hội Đồng Tranh Biện", f"Chủ đề: {topic}", full_log[:1000])
+
 
     # TAB 4: VOICE
     with tab4:
@@ -649,6 +646,7 @@ YÊU CẦU:
                 except:
                     pass
 
+
             with st.expander("🔮 Phân tích Tư duy theo xác suất Bayes (E.T. Jaynes)", expanded=False):
                 st.info("AI sẽ coi Lịch sử hoạt động của chị là 'Dữ liệu quan sát' (Evidence) để suy luận ra 'Hàm mục tiêu' (Objective Function) và sự dịch chuyển niềm tin của chị.")
 
@@ -658,23 +656,29 @@ YÊU CẦU:
                         logs_text = json.dumps(recent_logs, ensure_ascii=False)
 
                         bayes_prompt = f"""
-                        Đóng vai một nhà khoa học tư duy theo trường phái E.T. Jaynes (sách 'Probability Theory: The Logic of Science').
+Đóng vai một nhà khoa học tư duy theo trường phái E.T. Jaynes (sách 'Probability Theory: The Logic of Science').
 
-                        DỮ LIỆU QUAN SÁT (EVIDENCE):
-                        Đây là nhật ký hoạt động của tôi:
-                        {logs_text}
+DỮ LIỆU QUAN SÁT (EVIDENCE):
+Đây là nhật ký hoạt động của tôi:
+{logs_text}
 
-                        NHIỆM VỤ:
-                        Hãy phân tích chuỗi hành động này như một bài toán suy luận Bayes.
-                        1. **Xác định Priors (Niềm tin tiên nghiệm):** Dựa trên các hành động đầu, tôi đang quan tâm/tin tưởng điều gì?
-                        2. **Cập nhật Likelihood (Khả năng):** Các hành động tiếp theo củng cố hay làm yếu đi niềm tin đó?
-                        3. **Kết luận Posterior (Hậu nghiệm):** Trạng thái tư duy hiện tại của tôi đang hội tụ về đâu? Có mâu thuẫn (Inconsistency) nào trong logic hành động không?
+NHIỆM VỤ:
+Hãy phân tích chuỗi hành động này như một bài toán suy luận Bayes.
+1. **Xác định Priors (Niềm tin tiên nghiệm):** Dựa trên các hành động đầu, tôi đang quan tâm/tin tưởng điều gì?
+2. **Cập nhật Likelihood (Khả năng):** Các hành động tiếp theo củng cố hay làm yếu đi niềm tin đó?
+3. **Kết luận Posterior (Hậu nghiệm):** Trạng thái tư duy hiện tại của tôi đang hội tụ về đâu? Có mâu thuẫn (Inconsistency) nào trong logic hành động không?
 
-                        Trả lời ngắn gọn, sâu sắc, dùng thuật ngữ xác suất nhưng dễ hiểu.
-                        """
+Trả lời ngắn gọn, sâu sắc, dùng thuật ngữ xác suất nhưng dễ hiểu.
+"""
 
-                        analysis = ai.generate(bayes_prompt, model_type="pro")
+                        # ✅ DÙNG PARALLEL RACING cho Bayes (phức tạp, cần nhiều thời gian)
+                        analysis = ai.generate(
+                            bayes_prompt, 
+                            model_type="pro", 
+                            use_parallel=True  # ✅ BẬT PARALLEL MODE
+                        )
                         st.markdown(analysis)
+
 
             st.divider()
             for index, item in df_h.iterrows():
