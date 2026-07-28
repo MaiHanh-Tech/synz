@@ -19,7 +19,8 @@ from services.blocks.rag_orchestrator import (
     init_knowledge_universe, 
     create_personal_rag, 
     tai_lich_su,
-    get_translation_orchestrator
+    get_translation_orchestrator,
+    build_retrieval_context,
 )
 
 # KG module cho upgrade
@@ -281,6 +282,7 @@ def run():
                     continue
 
                 link = ""
+                matches = []
                 if has_db_excel and vec is not None:
                     try:
                         matches = compute_similarity_with_excel(text, pd.read_excel(file_excel).dropna(subset=["Tên sách"]), vec)
@@ -297,8 +299,16 @@ def run():
                     except Exception as e:
                         st.warning(f"Lỗi KG search: {e}")
 
+                # ✅ FIX Bước 0: nối retrieval vào prompt — trước đây `related`/`matches`
+                # chỉ hiển thị UI, AI không hề thấy khi viết bài phân tích.
+                retrieval_context = build_retrieval_context(related, matches)
+
                 with st.spinner(T("t1_analyzing").format(name=f.name)):
-                    res = analyze_document_streamlit(f.name, text, user_lang=st.session_state.get('weaver_lang', 'vi'))
+                    res = analyze_document_streamlit(
+                        f.name, text,
+                        user_lang=st.session_state.get('weaver_lang', 'vi'),
+                        retrieval_context=retrieval_context,
+                    )
                     if res and "Lỗi" not in res:
                         st.markdown(f"### 📄 {f.name}")
                         if link:
