@@ -67,15 +67,81 @@ def _get_supabase_client():
 # -------------------------
 # Core helpers / wrappers
 # -------------------------
-def analyze_document_streamlit(title: str, text: str, user_lang: str = "vi", max_chars: int = 30000) -> str:
+# -------------------------
+# [Meta-block] Retrieval context formatter
+# -------------------------
+def build_retrieval_context(related_books: list = None, excel_matches: list = None) -> str:
+    """
+    [Block] Format kết quả truy xuất (Knowledge Graph + Excel similarity)
+    thành một đoạn context sẵn sàng chèn vào prompt gửi cho AI.
+
+    Input:
+        related_books: list các tuple (node_id, title, score, explanation)
+                        trả về từ KnowledgeUniverse.find_related_books()
+        excel_matches:  list các tuple (title, score)
+                        trả về từ compute_similarity_with_excel()
+    Output:
+        str — chuỗi context đã format, "" nếu không có gì để truy xuất.
+
+    Pure function (không gọi Streamlit, không side-effect) — test độc lập
+    được, tái dùng được ở bất kỳ luồng phân tích nào khác, không chỉ Tab 1.
+    """
+    if not related_books and not excel_matches:
+        return ""
+
+    lines = ["=== TRI THỨC LIÊN QUAN ĐÃ TRUY XUẤT (đối chiếu nếu phù hợp, không ép buộc) ==="]
+
+    for item in (related_books or []):
+        try:
+            _, title, score, explanation = item
+            lines.append(f"- {title} (độ liên quan: {score:.2f}) — {explanation}")
+        except Exception:
+            continue
+
+    if excel_matches:
+        lines.append("--- Sách tương tự từ thư viện cá nhân (Excel) ---")
+        for item in excel_matches:
+            try:
+                title, score = item
+                lines.append(f"- {title} ({score*100:.0f}%)")
+            except Exception:
+                continue
+
+    return "\n".join(lines)
+
+
+def analyze_document_streamlit(
+    title: str,
+    text: str,
+    user_lang: str = "vi",
+    max_chars: int = 30000,
+    retrieval_context: str = "",
+) -> str:
     """
     Thin wrapper around AI_Core.analyze_static for UI.
+
+    ✅ FIX: nhận thêm `retrieval_context` (từ build_retrieval_context) và
+    chèn vào instruction trước khi gọi AI. Trước bản vá này, kết quả
+    Knowledge Graph / Excel similarity chỉ hiển thị song song trên UI và
+    KHÔNG hề được model nhìn thấy khi viết bài phân tích — retrieval tồn
+    tại nhưng "chết", không ảnh hưởng gì tới output.
+
     Returns AI text (or error string).
     """
     try:
         ai = AI_Core()
         content = text[:max_chars]
-        return ai.analyze_static(content, BOOK_ANALYSIS_PROMPT)
+
+        instruction = BOOK_ANALYSIS_PROMPT
+        if retrieval_context:
+            instruction = (
+                f"{BOOK_ANALYSIS_PROMPT}\n\n{retrieval_context}\n\n"
+                "LƯU Ý: ở mục 'Kết nối tri thức', hãy đối chiếu với các sách "
+                "liên quan đã truy xuất ở trên nếu có kết nối thực sự tự nhiên. "
+                "Không ép buộc liên hệ nếu không phù hợp."
+            )
+
+        return ai.analyze_static(content, instruction)
     except Exception as e:
         return f"❌ Lỗi phân tích: {e}"
 
