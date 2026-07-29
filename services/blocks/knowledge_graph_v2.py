@@ -68,13 +68,15 @@ class KnowledgeUniverse:
                 else:
                     self.graph.add_edge(node_id, other_id, relation="reference", weight=sim, confidence=sim)
 
-    def find_related_books(self, query_text, top_k=5, min_score=0.5):
+    def find_related_books(self, query_text, top_k=5, min_score=0.35):
         """
-        [Verified fix] Trước đây luôn trả về top_k dù điểm liên quan thấp
-        (0.46-0.51 vẫn hiện ra như match tốt). Giờ lọc bỏ kết quả dưới
-        `min_score` — 0.5 là ngưỡng khởi điểm hợp lý [Inference, chưa
-        được kiểm chứng thực nghiệm trên dữ liệu của chị], có thể chỉnh
-        lại nếu vẫn thấy kết quả không liên quan hoặc quá ít kết quả hiện ra.
+        [Điều chỉnh] Ngưỡng 0.5 đặt ở lần sửa trước quá chặt — vì graph 18 sách
+        tinh hoa vẫn đang embed cả cuốn thành 1 vector duy nhất (chưa chunking,
+        đây chính là Bước 1 còn treo), điểm cosine similarity với model
+        multilingual-MiniLM hiếm khi vượt 0.5-0.6 dù nội dung thực sự liên quan.
+        0.35 là mức thỏa hiệp tạm thời [Inference, chưa kiểm chứng thực nghiệm] —
+        đủ lọc rác nhưng không làm cả mục "18 sách tinh hoa" biến mất hoàn toàn.
+        Vẫn còn hên-xui vì gốc rễ là thiếu chunking, không phải ngưỡng đúng-sai.
         """
         query_emb = self.encoder.encode([query_text])[0]
         results = []
