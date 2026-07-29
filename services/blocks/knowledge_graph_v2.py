@@ -68,7 +68,14 @@ class KnowledgeUniverse:
                 else:
                     self.graph.add_edge(node_id, other_id, relation="reference", weight=sim, confidence=sim)
 
-    def find_related_books(self, query_text, top_k=5):
+    def find_related_books(self, query_text, top_k=5, min_score=0.5):
+        """
+        [Verified fix] Trước đây luôn trả về top_k dù điểm liên quan thấp
+        (0.46-0.51 vẫn hiện ra như match tốt). Giờ lọc bỏ kết quả dưới
+        `min_score` — 0.5 là ngưỡng khởi điểm hợp lý [Inference, chưa
+        được kiểm chứng thực nghiệm trên dữ liệu của chị], có thể chỉnh
+        lại nếu vẫn thấy kết quả không liên quan hoặc quá ít kết quả hiện ra.
+        """
         query_emb = self.encoder.encode([query_text])[0]
         results = []
         for node_id in self.graph.nodes:
@@ -76,6 +83,8 @@ class KnowledgeUniverse:
             if node["type"] != "book":
                 continue
             sim = cosine_similarity([query_emb], [node["embedding"]])[0][0]
+            if sim < min_score:
+                continue
             path_explanation = self._explain_connection(query_text, node_id)
             results.append((node_id, node["title"], float(sim), path_explanation))
         results.sort(key=lambda x: x[2], reverse=True)
@@ -311,7 +320,13 @@ def add_selected_books(kg: KnowledgeUniverse):
         st.error("❌ Không thêm được sách nào vào Knowledge Graph")
         
 def upgrade_existing_database(excel_path, kg: KnowledgeUniverse):
-    """Nâng cấp KG hiện có bằng cách thêm sách từ Excel"""
+    """
+    ⚠️ KHÔNG CÒN ĐƯỢC GỌI (deprecated) — trước đây dùng để trộn sách Excel
+    vào graph 18 sách tinh hoa, gây sai nhãn UI + lệch phân loại 4 tầng.
+    Giờ sách Excel được so khớp riêng qua compute_similarity_with_excel()
+    trong rag_orchestrator.py, không đụng vào graph tinh hoa nữa.
+    Giữ lại hàm này (không xóa) phòng khi cần dùng lại có chủ đích.
+    """
     import pandas as pd
     
     try:
