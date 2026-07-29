@@ -349,36 +349,52 @@ class AI_Core:
     @staticmethod
     @st.cache_data(ttl=3600)
     def analyze_static(text, instruction):
-        """✅ RAG dùng Gemini (có cache, nhanh) - GIỮ NGUYÊN"""
-        try:
-            # ✅ Ưu tiên Gemini cho RAG (có cache)
-            if "api_keys" in st.secrets and "gemini_api_key" in st.secrets["api_keys"]:
+        """
+        RAG dùng Gemini trước (có cache), tự động rơi xuống DeepSeek nếu Gemini lỗi.
+
+        ✅ FIX: trước đây nếu Gemini raise exception (vd: 429 hết quota), code
+        return lỗi ngay lập tức, KHÔNG BAO GIỜ chạy tới đoạn fallback DeepSeek
+        bên dưới — dù đoạn đó vẫn tồn tại trong code. Giờ mỗi provider có
+        try/except riêng, Gemini lỗi thì thử DeepSeek tiếp, không bỏ cuộc sớm.
+        """
+        gemini_error = None
+
+        # 1. Thử Gemini trước
+        if "api_keys" in st.secrets and "gemini_api_key" in st.secrets["api_keys"]:
+            try:
                 genai.configure(api_key=st.secrets["api_keys"]["gemini_api_key"])
                 model = genai.GenerativeModel("gemini-2.5-flash")
-                text = text[:150000]
-                response = model.generate_content(f"{instruction}\n\n{text}")
+                gemini_text = text[:150000]
+                response = model.generate_content(f"{instruction}\n\n{gemini_text}")
                 if response and response.text:
                     return response.text.strip()
-            
-            # Fallback DeepSeek
-            if "deepseek" in st.secrets:
+            except Exception as e:
+                gemini_error = str(e)[:150]  # lưu lại, KHÔNG return ngay — thử DeepSeek tiếp
+
+        # 2. Fallback DeepSeek — giờ chạy được cả khi Gemini raise exception
+        if "deepseek" in st.secrets:
+            try:
                 client = OpenAI(
                     api_key=st.secrets["deepseek"]["api_key"],
                     base_url="https://api.deepseek.com/v1",
                     timeout=60
                 )
-                text = text[:180000]
+                ds_text = text[:180000]
                 resp = client.chat.completions.create(
                     model="deepseek-chat",
                     messages=[
                         {"role": "system", "content": instruction},
-                        {"role": "user", "content": text}
+                        {"role": "user", "content": ds_text}
                     ],
                     max_tokens=4000,
                     temperature=0.3
                 )
                 return resp.choices[0].message.content.strip()
-                
-            return "❌ Không có API khả dụng"
-        except Exception as e:
-            return f"❌ RAG lỗi: {str(e)[:150]}"
+            except Exception as e:
+                if gemini_error:
+                    return f"❌ Cả Gemini và DeepSeek đều lỗi. Gemini: {gemini_error} | DeepSeek: {str(e)[:150]}"
+                return f"❌ RAG lỗi (DeepSeek): {str(e)[:150]}"
+
+        if gemini_error:
+            return f"❌ RAG lỗi (Gemini): {gemini_error}"
+        return "❌ Không có API khả dụng"
