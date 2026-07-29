@@ -489,114 +489,130 @@ def run():
                             st.session_state.weaver_chat.append({"role": "assistant", "content": res})
                             store_history("Tranh Biện Solo", f"{persona} - {prompt[:50]}...", f"Q: {prompt}\nA: {res}")
                             
-        # ✅ THAY THẾ PHẦN MULTI-AGENT TRONG TAB 3 
+        # ✅ THAY THẾ PHẦN MULTI-AGENT TRONG TAB 3
+        # ✅ SỬA: 3 vòng, chạy TUẦN TỰ (không còn song song) — mỗi người nói
+        # sau đọc được nguyên văn người nói ngay trước để phản biện thật,
+        # thay vì tất cả trả lời "mù" cùng lúc rồi ghép lại như trước.
 
         else:  # Multi-Agent mode
+            all_personas = list(DEBATE_PERSONAS.keys())
             participants = st.multiselect(
-                "Chọn Hội Đồng:", 
-                list(DEBATE_PERSONAS.keys()),
-                default=[list(DEBATE_PERSONAS.keys())[0], list(DEBATE_PERSONAS.keys())[1]],
+                "Chọn Hội Đồng (2 hoặc 3 người):",
+                all_personas,
+                default=all_personas[:2],
                 max_selections=3
             )
             topic = st.text_input("Chủ đề:", key="w_t3_topic")
-            
+            NUM_ROUNDS = st.radio("Số vòng thảo luận:", [2, 3], index=1, horizontal=True)
+
             if st.button("🔥 KHAI CHIẾN", disabled=(len(participants) < 2 or not topic)):
                 st.session_state.weaver_chat = []
-                start_msg = f"📢 **CHỦ TỌA:** Khai mạc tranh luận về: *'{topic}'*"
+                start_msg = f"📢 **CHỦ TỌA:** Khai mạc tranh luận {NUM_ROUNDS} vòng về: *'{topic}'*"
                 st.session_state.weaver_chat.append({"role": "system", "content": start_msg})
                 st.info(start_msg)
                 full_transcript = [start_msg]
 
-                MAX_DEBATE_TIME = 120  # ✅ GIẢM xuống 120s (đủ cho 2 vòng parallel)
+                # ✅ Mỗi lượt giờ là 1 lệnh gọi tuần tự (không còn batch song song)
+                # nên cần nhiều thời gian hơn — 45s/lượt là ước lượng khởi điểm
+                # [Inference, chưa đo thực tế], chỉnh lại nếu vẫn bị hết giờ.
+                MAX_DEBATE_TIME = 45 * NUM_ROUNDS * len(participants)
                 start_time = time.time()
 
-                with st.status("🔥 Cuộc chiến đang diễn ra (2 vòng)...") as status:
+                icons = {
+                    "Kẻ Phản Biện": "😈",
+                    "🎩 Shushu": "🎩",
+                    "🙏 Phật Tổ": "🙏",
+                    "🤔 Logic & Phản Biện": "🤔",
+                    "📈 Thực Tế & Đột Phá": "📈"
+                }
+
+                # (prev_speaker, prev_content) của lượt nói liền trước — xuyên
+                # suốt cả 3 vòng, không reset theo từng vòng, vì "người sau
+                # phản biện người trước" áp dụng liên tục kể cả qua vòng mới.
+                prev_speaker, prev_content = None, None
+
+                with st.status(f"🔥 Cuộc chiến đang diễn ra ({NUM_ROUNDS} vòng)...") as status:
                     try:
-                        for round_num in range(1, 3):
-                            elapsed = time.time() - start_time
-                            if elapsed > MAX_DEBATE_TIME:
-                                st.warning(f"⏰ Hết giờ! (Đã chạy {elapsed:.0f}s)")
-                                break
+                        for round_num in range(1, NUM_ROUNDS + 1):
+                            status.update(label=f"🔄 Vòng {round_num}/{NUM_ROUNDS}...")
 
-                            status.update(label=f"🔄 Vòng {round_num}/2...")
-
-                            # ✅ TẠO PROMPTS cho TẤT CẢ personas CÙNG LÚC
-                            prompts_dict = {}
-                            sys_insts_dict = {}
-                            
                             for p_name in participants:
-                                context_str = topic
-                                if len(st.session_state.weaver_chat) > 1:
-                                    recent_msgs = st.session_state.weaver_chat[-2:]
-                                    context_str = "\n".join([
-                                        f"{m['role']}: {m['content'][:200]}..."
-                                        for m in recent_msgs
-                                    ])
+                                elapsed = time.time() - start_time
+                                if elapsed > MAX_DEBATE_TIME:
+                                    st.warning(f"⏰ Hết giờ! (Đã chạy {elapsed:.0f}s)")
+                                    raise TimeoutError("debate_timeout")
 
-                                if round_num == 1:
+                                # ✅ Người nói cuối cùng của vòng cuối = người đóng vòng
+                                # thảo luận (tổng kết), không chỉ phản biện như bình thường.
+                                is_closing_turn = (round_num == NUM_ROUNDS and p_name == participants[-1])
+
+                                if prev_speaker is None:
+                                    # Lượt mở màn — chưa có ai để phản biện
                                     p_prompt = f"""CHỦ ĐỀ: {topic}
 
 NHIỆM VỤ: Nêu 1 quan điểm chính + 1-2 lý lẽ ngắn gọn.
-YÊU CẦU: 
-- Tối đa 300 từ (rút ngắn để nhanh hơn)
-- Không dùng ký tự cảnh báo
-- Đi thẳng vào vấn đề"""
-                                else:
-                                    p_prompt = f"""CHỦ ĐỀ: {topic}
-
-BỐI CẢNH GẦN NHẤT:
-{context_str}
-
-NHIỆM VỤ: Phản biện hoặc bổ sung quan điểm.
 YÊU CẦU:
 - Tối đa 300 từ
 - Không dùng ký tự cảnh báo
-- Tập trung vào luận điểm chính"""
+- Đi thẳng vào vấn đề"""
+                                elif is_closing_turn:
+                                    p_prompt = f"""CHỦ ĐỀ: {topic}
 
-                                prompts_dict[p_name] = p_prompt
-                                sys_insts_dict[p_name] = DEBATE_PERSONAS[p_name]
+Ý KIẾN CỦA {prev_speaker} (người nói ngay trước bạn):
+\"\"\"{prev_content[:800]}\"\"\"
 
-                            # ✅ GỌI BATCH (TẤT CẢ PERSONAS SONG SONG)
-                            with st.spinner(f"🤖 Tất cả đang suy nghĩ song song..."):
-                                batch_results = ai.generate_batch(
-                                    prompts_dict, 
-                                    sys_insts_dict, 
-                                    max_tokens=2000  # Rút ngắn để nhanh hơn
-                                )
-
-                            # ✅ HIỂN THỊ KẾT QUẢ theo thứ tự personas
-                            icons = {
-                                "Kẻ Phản Biện": "😈",
-                                "🎩 Shushu": "🎩",
-                                "🙏 Phật Tổ": "🙏",
-                                "🤔 Logic & Phản Biện": "🤔",
-                                "📈 Thực Tế & Đột Phá": "📈"
-                            }
-                            
-                            for p_name in participants:
-                                if p_name in batch_results:
-                                    result = batch_results[p_name]
-                                    clean_res = result['content'].replace(f"{p_name}:", "").strip()
-                                    clean_res = clean_res.replace(f"**{p_name}:**", "").strip()
-                                    if "⚠️" in clean_res:
-                                        clean_res = clean_res.replace("⚠️", "").strip()
-                                    
-                                    icon = icons.get(p_name, "🤖")
-                                    source_tag = f"[{result['source']}]" if 'source' in result else ""
-                                    
-                                    content_fmt = f"### {icon} {p_name} {source_tag}\n\n{clean_res}"
-                                    st.session_state.weaver_chat.append({"role": "assistant", "content": content_fmt})
-                                    full_transcript.append(content_fmt)
-                                    
-                                    with st.chat_message("assistant", avatar=icon):
-                                        st.markdown(content_fmt)
+NHIỆM VỤ: Đây là lượt phát biểu CUỐI CÙNG của cuộc tranh biện {NUM_ROUNDS} vòng. Bạn phải làm 2 việc, theo đúng thứ tự:
+1. Phản biện trực tiếp lập luận của {prev_speaker} ở trên — như các vòng trước.
+2. Sau đó ĐÓNG VÒNG THẢO LUẬN: tổng kết ngắn gọn các luồng quan điểm chính đã xuất hiện xuyên suốt cả {NUM_ROUNDS} vòng, chỉ rõ điểm các bên đồng thuận (nếu có) và điểm còn bất đồng, rồi đưa ra kết luận cuối cùng của riêng bạn.
+YÊU CẦU:
+- Tối đa 400 từ
+- Không dùng ký tự cảnh báo
+- Phần tổng kết phải tách riêng rõ ràng, bắt đầu bằng dòng "**Kết luận:**\""""
                                 else:
-                                    st.warning(f"⚠️ {p_name} không phản hồi kịp thời")
-                            
-                            time.sleep(1)  # Ngắt giữa các vòng
-                                    
+                                    p_prompt = f"""CHỦ ĐỀ: {topic}
+
+Ý KIẾN CỦA {prev_speaker} (người nói ngay trước bạn):
+\"\"\"{prev_content[:800]}\"\"\"
+
+NHIỆM VỤ: Phản biện trực tiếp lập luận của {prev_speaker} ở trên — chỉ rõ
+điểm bạn không đồng ý hoặc góc nhìn bạn muốn bổ sung — sau đó nêu quan điểm
+của riêng bạn.
+YÊU CẦU:
+- Tối đa 300 từ
+- Không dùng ký tự cảnh báo
+- Phải phản hồi cụ thể vào luận điểm của {prev_speaker}, không né tránh"""
+
+                                with st.spinner(f"🤖 {p_name} đang phản biện..."):
+                                    try:
+                                        result = ai.generate(
+                                            p_prompt,
+                                            model_type="flash",
+                                            system_instruction=DEBATE_PERSONAS[p_name],
+                                            max_tokens=2000,
+                                        )
+                                    except Exception as e:
+                                        st.warning(f"⚠️ {p_name} không phản hồi kịp thời: {e}")
+                                        continue
+
+                                clean_res = (result or "").replace(f"{p_name}:", "").strip()
+                                clean_res = clean_res.replace(f"**{p_name}:**", "").strip()
+                                clean_res = clean_res.replace("⚠️", "").strip()
+
+                                icon = icons.get(p_name, "🤖")
+                                round_label = f"Vòng {round_num}" + (" — Đóng vòng thảo luận 🏁" if is_closing_turn else "")
+                                content_fmt = f"### {icon} {p_name} — {round_label}\n\n{clean_res}"
+                                st.session_state.weaver_chat.append({"role": "assistant", "content": content_fmt})
+                                full_transcript.append(content_fmt)
+
+                                with st.chat_message("assistant", avatar=icon):
+                                    st.markdown(content_fmt)
+
+                                prev_speaker, prev_content = p_name, clean_res
+
                         status.update(label="✅ Tranh luận kết thúc!", state="complete")
-                        
+
+                    except TimeoutError:
+                        status.update(label="⏰ Dừng do hết giờ", state="error")
                     except Exception as e:
                         st.error(f"❌ Lỗi nghiêm trọng: {e}")
                         with st.expander("🔍 Stack trace đầy đủ"):
