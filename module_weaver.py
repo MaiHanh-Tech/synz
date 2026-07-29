@@ -172,40 +172,24 @@ def check_model_available():
 def doc_file_safe(uploaded_file):
     return doc_file(uploaded_file)
 
-# ✅ SỬA: Helper để init KnowledgeUniverse với sách tinh hoa + Excel upgrade
+# ✅ FIX: KHÔNG còn upgrade Excel vào graph 18 sách tinh hoa.
+# Trước đây upgrade_existing_database() đổ toàn bộ sách Excel cá nhân vào
+# chung graph, khiến nhãn "(18 sách tinh hoa)" sai và bộ phân loại 4 tầng
+# bị lấn bởi sách không có tag khớp (rơi vào default "Văn hóa & Quyền lực").
+# Giờ: graph tinh hoa luôn đúng 18 cuốn, cố định. Sách Excel cá nhân được
+# so khớp riêng qua compute_similarity_with_excel() — đã tồn tại sẵn, không
+# đụng vào graph này.
 @st.cache_resource
-def get_knowledge_universe(excel_file=None):
-    """Khởi tạo Knowledge Graph với sách tinh hoa (18 sách) + optional Excel upgrade"""
+def get_knowledge_universe():
+    """Khởi tạo Knowledge Graph — luôn đúng 18 sách tinh hoa, không trộn Excel."""
     try:
-        # BƯỚC 1: Tạo KG cơ bản (đã có 18 sách tinh hoa từ knowledge_graph_v2.py)
         ku = init_knowledge_universe()
         if not ku:
             st.warning("⚠️ Không thể khởi tạo Knowledge Graph")
             return None
-        
-        # BƯỚC 2: Nếu có Excel, upgrade thêm sách từ Excel
-        if excel_file:
-            try:
-                # Đọc Excel để lấy danh sách sách
-                df_excel = pd.read_excel(excel_file).dropna(subset=["Tên sách"])
-                st.success(f"✅ Đã kết nối {len(df_excel)} cuốn sách từ Excel")
-                
-                # Upgrade KG với sách từ Excel
-                ku = kg_module.upgrade_existing_database(excel_file, ku)
-                
-                # Hiển thị thông báo thành công
-                total_books = len(ku.graph.nodes)
-                st.success(f"✅ Đã tải {total_books} sách vào Knowledge Graph (bao gồm 18 sách tinh hoa + {len(df_excel)} từ Excel)")
-                
-            except Exception as e:
-                st.warning(f"⚠️ Không thể upgrade từ Excel: {e}")
-        else:
-            # Chỉ có sách tinh hoa
-            total_books = len(ku.graph.nodes)
-            st.info(f"📚 Đã tải {total_books} sách tinh hoa vào Knowledge Graph (18 sách bao trùm 4 tầng triết học)")
-        
+        total_books = len(ku.graph.nodes)
+        st.info(f"📚 Đã tải {total_books} sách tinh hoa vào Knowledge Graph (18 sách bao trùm 4 tầng triết học)")
         return ku
-        
     except Exception as e:
         st.error(f"❌ Lỗi khởi tạo Knowledge Graph: {e}")
         return None
@@ -267,9 +251,8 @@ def run():
                 st.write("")
                 btn_run = st.button(T("t1_btn"), type="primary", use_container_width=True)
 
-        # ✅ RELOAD KG nếu có Excel mới
-        if file_excel and btn_run:
-            knowledge_universe = get_knowledge_universe(file_excel)
+        # (Đã bỏ reload KG theo Excel — graph 18 sách tinh hoa cố định,
+        #  không còn phụ thuộc vào việc có upload Excel hay không)
 
         if btn_run and uploaded_files:
             vec = load_encoder()
