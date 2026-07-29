@@ -613,11 +613,17 @@ Text:
         for item in words:
             word = item.get('word', '')
             pinyin = item.get('pinyin', '')
-            translations = item.get('translations', [])
-            meaning = translations[0] if translations else ""
+            # ✅ FIX: schema WordDefinition (translator.py) trả về field 'translation'
+            # (số ít, 1 chuỗi) — code cũ đọc nhầm key 'translations' (số nhiều, không
+            # tồn tại) nên luôn nhận [] và nghĩa tiếng Việt luôn rỗng, bất kể AI trả
+            # về gì. Đây là nguyên nhân chính khiến hover không ra tiếng Việt.
+            meaning = item.get('translation', '')
 
             safe_word = word.replace("'", "\\'").replace('"', '&quot;')
-            tooltip = f"{pinyin}\\n{meaning}"
+            # ✅ FIX: "\\n" là 2 ký tự backslash+n hiển thị y nguyên trên tooltip,
+            # không phải xuống dòng thật. CSS dùng white-space: pre-line nên chỉ
+            # cần ký tự xuống dòng thật (\n) là hiển thị đúng 2 dòng.
+            tooltip = f"{pinyin}\n{meaning}" if meaning else pinyin
 
             html += f'<span class="interactive-word" data-tooltip="{tooltip}">{word}</span>'
 
