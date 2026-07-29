@@ -582,7 +582,7 @@ Text:
    transform: translateY(-2px);
   }}
   .interactive-word:hover::after {{
-   content: attr(data-tooltip);
+   content: attr(data-pinyin) "\\A" attr(data-meaning);
    position: absolute;
    bottom: 100%;
    left: 50%;
@@ -610,22 +610,30 @@ Text:
  <div class="content-box">
 """
 
+        def _esc_attr(s: str) -> str:
+            """
+            [Block] Escape ký tự đặc biệt trước khi chèn vào thuộc tính HTML.
+            Trước bản vá này KHÔNG có bước escape nào được áp dụng thật sự —
+            `safe_word` từng được tính nhưng không hề dùng. Nếu nghĩa tiếng Việt
+            AI trả về chứa dấu " (khá phổ biến khi AI chú thích thêm), thuộc
+            tính data-tooltip bị cắt ngang giữa chừng → HTML hỏng → tooltip
+            hiện ra thành ô đen trống, đúng như ảnh chị gửi.
+            """
+            return (s or "").replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+
         for item in words:
             word = item.get('word', '')
             pinyin = item.get('pinyin', '')
-            # ✅ FIX: schema WordDefinition (translator.py) trả về field 'translation'
-            # (số ít, 1 chuỗi) — code cũ đọc nhầm key 'translations' (số nhiều, không
-            # tồn tại) nên luôn nhận [] và nghĩa tiếng Việt luôn rỗng, bất kể AI trả
-            # về gì. Đây là nguyên nhân chính khiến hover không ra tiếng Việt.
             meaning = item.get('translation', '')
 
-            safe_word = word.replace("'", "\\'").replace('"', '&quot;')
-            # ✅ FIX: "\\n" là 2 ký tự backslash+n hiển thị y nguyên trên tooltip,
-            # không phải xuống dòng thật. CSS dùng white-space: pre-line nên chỉ
-            # cần ký tự xuống dòng thật (\n) là hiển thị đúng 2 dòng.
-            tooltip = f"{pinyin}\n{meaning}" if meaning else pinyin
+            safe_word = _esc_attr(word)
+            safe_pinyin = _esc_attr(pinyin)
+            safe_meaning = _esc_attr(meaning)
 
-            html += f'<span class="interactive-word" data-tooltip="{tooltip}">{word}</span>'
+            html += (
+                f'<span class="interactive-word" '
+                f'data-pinyin="{safe_pinyin}" data-meaning="{safe_meaning}">{safe_word}</span>'
+            )
 
         html += """
  </div>
