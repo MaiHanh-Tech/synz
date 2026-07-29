@@ -292,7 +292,11 @@ def run():
                         user_lang=st.session_state.get('weaver_lang', 'vi'),
                         retrieval_context=retrieval_context,
                     )
-                    if res and "Lỗi" not in res:
+                    # ✅ FIX: kiểm tra "Lỗi" bằng substring khiến bài phân tích hợp lệ
+                    # nhưng có chữ "Lỗi" trong nội dung (vd: "Lỗi Ngữ pháp" của Metzinger)
+                    # bị nhận nhầm là thất bại. analyze_document_streamlit() luôn trả về
+                    # chuỗi bắt đầu bằng "❌" khi thật sự lỗi — kiểm tra đúng dấu hiệu đó.
+                    if res and not res.strip().startswith("❌"):
                         st.markdown(f"### 📄 {f.name}")
                         if link:
                             st.markdown("**🔗 Sách tương tự từ Excel:**")
@@ -396,9 +400,11 @@ def run():
                         status_text.text(f"Đang dịch... {int(value*100)}%")
 
                     try:
+                        html_output = None  # ✅ FIX: khởi tạo sẵn, tránh UnboundLocalError
+
                         if mode == "Interactive (chỉ tiếng Trung → Việt)":
                             if source_lang != "Chinese":
-                                st.error("Interactive mode chỉ hỗ trợ nguồn tiếng Trung.")
+                                st.error("Interactive mode chỉ hỗ trợ nguồn tiếng Trung. Hãy đổi 'Ngôn ngữ nguồn' thành Chinese, hoặc chọn chế độ 'Standard'.")
                             else:
                                 status_text.text("Đang xử lý interactive translation...")
                                 html_output = orchestrator.translate_interactive(
@@ -416,28 +422,34 @@ def run():
                                 progress_callback=update_progress
                             )
 
-                        # Thành công
-                        progress_bar.progress(1.0)
-                        status_text.success("✅ Hoàn thành!")
+                        # ✅ FIX: nếu chưa có kết quả (do lệch mode/ngôn ngữ ở trên),
+                        # dừng ở đây — không chạy tiếp xuống phần tải/preview.
+                        if html_output is None:
+                            progress_bar.empty()
+                            status_text.empty()
+                        else:
+                            # Thành công
+                            progress_bar.progress(1.0)
+                            status_text.success("✅ Hoàn thành!")
 
-                        # Nút tải HTML
-                        st.download_button(
-                            label="📥 Tải file HTML kết quả",
-                            data=html_output.encode('utf-8'),
-                            file_name=f"translation_{source_lang}_to_{target_lang}.html",
-                            mime="text/html"
-                        )
+                            # Nút tải HTML
+                            st.download_button(
+                                label="📥 Tải file HTML kết quả",
+                                data=html_output.encode('utf-8'),
+                                file_name=f"translation_{source_lang}_to_{target_lang}.html",
+                                mime="text/html"
+                            )
 
-                        # Preview
-                        with st.expander("👀 Xem trước kết quả", expanded=True):
-                            st.components.v1.html(html_output, height=800, scrolling=True)
+                            # Preview
+                            with st.expander("👀 Xem trước kết quả", expanded=True):
+                                st.components.v1.html(html_output, height=800, scrolling=True)
 
-                        # Lưu lịch sử
-                        store_history(
-                            "Dịch Thuật",
-                            f"{source_lang} → {target_lang} ({mode})",
-                            input_text[:300]
-                        )
+                            # Lưu lịch sử
+                            store_history(
+                                "Dịch Thuật",
+                                f"{source_lang} → {target_lang} ({mode})",
+                                input_text[:300]
+                            )
 
                     except Exception as e:
                         progress_bar.empty()
